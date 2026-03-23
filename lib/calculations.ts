@@ -2,6 +2,10 @@ import {
   TeamEventStats2025,
   TeamEventStats2025Group,
   ProcessedTeam,
+  TeamEventEntry,
+  PrescoutTeamData,
+  PrescoutRankedTeam,
+  TrendDirection,
 } from "./types";
 
 /**
@@ -235,4 +239,108 @@ export function rankPartners(
 
   results.sort((a, b) => b.score - a.score);
   return results;
+}
+
+// ── Prescout Calculations ──
+
+function eventsWithStats(events: TeamEventEntry[]): (TeamEventEntry & { stats: TeamEventStats2025 })[] {
+  return events.filter((e): e is TeamEventEntry & { stats: TeamEventStats2025 } => e.stats !== null);
+}
+
+function eventsSortedChronologically(events: TeamEventEntry[]): (TeamEventEntry & { stats: TeamEventStats2025 })[] {
+  return eventsWithStats(events).sort(
+    (a, b) => new Date(a.event.start).getTime() - new Date(b.event.start).getTime()
+  );
+}
+
+export function getSeasonBestOpr(
+  events: TeamEventEntry[],
+  field: "totalPointsNp" | "autoPoints" | "dcPoints" = "totalPointsNp"
+): number {
+  const valid = eventsWithStats(events);
+  if (valid.length === 0) return 0;
+  return Math.max(...valid.map((e) => e.stats.opr[field]));
+}
+
+export function getSeasonAvg(
+  events: TeamEventEntry[],
+  accessor: (stats: TeamEventStats2025) => number
+): number {
+  const valid = eventsWithStats(events);
+  if (valid.length === 0) return 0;
+  const sum = valid.reduce((acc, e) => acc + accessor(e.stats), 0);
+  return sum / valid.length;
+}
+
+export function getSeasonRecord(
+  events: TeamEventEntry[]
+): { wins: number; losses: number; ties: number } {
+  const valid = eventsWithStats(events);
+  return valid.reduce(
+    (acc, e) => ({
+      wins: acc.wins + e.stats.wins,
+      losses: acc.losses + e.stats.losses,
+      ties: acc.ties + e.stats.ties,
+    }),
+    { wins: 0, losses: 0, ties: 0 }
+  );
+}
+
+export function getTrend(
+  events: TeamEventEntry[],
+  field: "totalPointsNp" | "autoPoints" | "dcPoints" = "totalPointsNp"
+): TrendDirection {
+  const sorted = eventsSortedChronologically(events);
+  if (sorted.length < 2) return "stable";
+  const recent = sorted.slice(-3);
+  if (recent.length < 2) return "stable";
+
+  let ups = 0;
+  let downs = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const diff = recent[i].stats.opr[field] - recent[i - 1].stats.opr[field];
+    if (diff > 3) ups++;
+    else if (diff < -3) downs++;
+  }
+
+  if (ups > downs) return "improving";
+  if (downs > ups) return "declining";
+  return "stable";
+}
+
+export function getPrescoutRanking(
+  allTeamsPrescoutData: PrescoutTeamData[]
+): PrescoutRankedTeam[] {
+  const ranked: PrescoutRankedTeam[] = allTeamsPrescoutData.map((team) => {
+    const valid = eventsWithStats(team.events);
+    const record = getSeasonRecord(team.events);
+    const eventCount = valid.length;
+
+    return {
+      rank: 0,
+      teamNumber: team.number,
+      teamName: team.name,
+      schoolName: team.schoolName,
+      bestOpr: getSeasonBestOpr(team.events, "totalPointsNp"),
+      bestAutoOpr: getSeasonBestOpr(team.events, "autoPoints"),
+      bestDcOpr: getSeasonBestOpr(team.events, "dcPoints"),
+      seasonAvg: getSeasonAvg(team.events, (s) => s.avg.totalPointsNp),
+      seasonAutoAvg: getSeasonAvg(team.events, (s) => s.avg.autoPoints),
+      seasonDcAvg: getSeasonAvg(team.events, (s) => s.avg.dcPoints),
+      record,
+      eventCount,
+      trend: getTrend(team.events),
+      avgRp: getSeasonAvg(team.events, (s) => s.rp),
+      avgMovementRp: getSeasonAvg(team.events, (s) => s.avg.movementRp ?? 0),
+      avgGoalRp: getSeasonAvg(team.events, (s) => s.avg.goalRp ?? 0),
+      avgPatternRp: getSeasonAvg(team.events, (s) => s.avg.patternRp ?? 0),
+      events: team.events,
+      quickStats: team.quickStats,
+    };
+  });
+
+  ranked.sort((a, b) => b.bestOpr - a.bestOpr);
+  ranked.forEach((t, i) => { t.rank = i + 1; });
+
+  return ranked;
 }

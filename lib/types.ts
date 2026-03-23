@@ -154,3 +154,37 @@ export interface ProcessedTeam {
   schoolName: string;
   stats: TeamEventStats2025;
 }
+
+// ── Prescout types ──
+
+export type TrendDirection = "improving" | "declining" | "stable";
+
+export interface PrescoutTeamData {
+  number: number;
+  name: string;
+  schoolName: string;
+  quickStats: QuickStats | null;
+  events: TeamEventEntry[];
+}
+
+export interface PrescoutRankedTeam {
+  rank: number;
+  teamNumber: number;
+  teamName: string;
+  schoolName: string;
+  bestOpr: number;
+  bestAutoOpr: number;
+  bestDcOpr: number;
+  seasonAvg: number;
+  seasonAutoAvg: number;
+  seasonDcAvg: number;
+  record: { wins: number; losses: number; ties: number };
+  eventCount: number;
+  trend: TrendDirection;
+  avgRp: number;
+  avgMovementRp: number;
+  avgGoalRp: number;
+  avgPatternRp: number;
+  events: TeamEventEntry[];
+  quickStats: QuickStats | null;
+}

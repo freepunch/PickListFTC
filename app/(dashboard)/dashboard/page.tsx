@@ -4,8 +4,10 @@ import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useEvent } from "@/context/EventContext";
 import { EventLoader, focusEventInput } from "@/components/EventLoader";
+import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { StatCard } from "@/components/StatCard";
 import { ScoreDistribution } from "@/components/ScoreDistribution";
+import { PrescoutRankedTeam } from "@/lib/types";
 
 function SkeletonCard() {
   return (
@@ -46,8 +48,207 @@ function SkeletonChart() {
   );
 }
 
+const TREND_ICON: Record<string, { icon: string; color: string }> = {
+  improving: { icon: "\u2191", color: "text-emerald-400" },
+  declining: { icon: "\u2193", color: "text-red-400" },
+  stable: { icon: "\u2192", color: "text-zinc-400" },
+};
+
+// ── Prescout Dashboard ──
+
+function PrescoutDashboard() {
+  const { event, prescoutRanking, prescoutLoading } = useEvent();
+
+  const { avgOpr, strongestTeam, mostExperienced, teamsToWatch } = useMemo(() => {
+    if (prescoutRanking.length === 0) {
+      return { avgOpr: 0, strongestTeam: null as PrescoutRankedTeam | null, mostExperienced: null as PrescoutRankedTeam | null, teamsToWatch: [] as PrescoutRankedTeam[] };
+    }
+
+    const avgOpr = prescoutRanking.reduce((s, t) => s + t.bestOpr, 0) / prescoutRanking.length;
+    const strongestTeam = prescoutRanking[0];
+    const mostExperienced = [...prescoutRanking].sort((a, b) => b.eventCount - a.eventCount)[0];
+
+    // Teams to watch: top 3 + improving teams with recent OPR above season avg
+    const top3 = prescoutRanking.slice(0, 3);
+    const risers = prescoutRanking.filter(
+      (t) => t.trend === "improving" && !top3.some((x) => x.teamNumber === t.teamNumber)
+    ).slice(0, 2);
+    const teamsToWatch = [...top3, ...risers];
+
+    return { avgOpr, strongestTeam, mostExperienced, teamsToWatch };
+  }, [prescoutRanking]);
+
+  if (prescoutLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonTable />
+          <SkeletonTable />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Teams Registered"
+          value={event?.teams.length ?? 0}
+          mono={false}
+        />
+        <StatCard
+          label="Avg Season Best OPR"
+          value={avgOpr.toFixed(1)}
+          subtitle="Across registered teams"
+        />
+        <StatCard
+          label="Strongest Team"
+          value={strongestTeam ? strongestTeam.bestOpr.toFixed(1) : "\u2014"}
+          subtitle={
+            strongestTeam
+              ? `#${strongestTeam.teamNumber} ${strongestTeam.teamName}`
+              : undefined
+          }
+        />
+        <StatCard
+          label="Most Experienced"
+          value={mostExperienced ? `${mostExperienced.eventCount} events` : "\u2014"}
+          subtitle={
+            mostExperienced
+              ? `#${mostExperienced.teamNumber} ${mostExperienced.teamName}`
+              : undefined
+          }
+          mono={false}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Prescout Leaderboard */}
+        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-200">
+              Prescout Rankings
+            </h3>
+            <Link
+              href="/leaderboard"
+              className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800/50">
+                  <th className="text-left px-5 py-2.5 w-12">#</th>
+                  <th className="text-left py-2.5">Team</th>
+                  <th className="text-right px-3 py-2.5">Season Best OPR</th>
+                  <th className="text-right px-3 py-2.5">Season Avg</th>
+                  <th className="text-left px-3 py-2.5">W-L-T</th>
+                  <th className="text-center px-3 py-2.5">Events</th>
+                  <th className="text-center px-5 py-2.5">Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prescoutRanking.slice(0, 10).map((team) => {
+                  const trend = TREND_ICON[team.trend];
+                  return (
+                    <tr
+                      key={team.teamNumber}
+                      className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 transition-colors cursor-pointer"
+                    >
+                      <td className="px-5 py-2.5 text-zinc-500 font-mono text-xs">
+                        {team.rank}
+                      </td>
+                      <td className="py-2.5">
+                        <Link href={`/report/${team.teamNumber}`} className="hover:underline">
+                          <span className="font-mono text-white text-xs mr-2">
+                            {team.teamNumber}
+                          </span>
+                          <span className="text-zinc-400 hidden sm:inline">
+                            {team.teamName}
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-white text-xs">
+                        {team.bestOpr.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-zinc-400 text-xs">
+                        {team.seasonAvg.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-zinc-400 text-xs">
+                        {team.record.wins}-{team.record.losses}-{team.record.ties}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-mono text-zinc-400 text-xs">
+                        {team.eventCount}
+                      </td>
+                      <td className="px-5 py-2.5 text-center">
+                        <span className={`text-sm ${trend.color}`}>{trend.icon}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Teams to Watch */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-200">
+              Teams to Watch
+            </h3>
+          </div>
+          <div className="p-4 space-y-3">
+            {teamsToWatch.map((team) => {
+              const trend = TREND_ICON[team.trend];
+              const isTop3 = team.rank <= 3;
+              return (
+                <Link
+                  key={team.teamNumber}
+                  href={`/report/${team.teamNumber}`}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                    isTop3 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
+                  }`}>
+                    {isTop3 ? `#${team.rank}` : trend.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">
+                      <span className="font-mono mr-1.5">{team.teamNumber}</span>
+                      {team.teamName}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      Best OPR {team.bestOpr.toFixed(1)} &middot; {team.eventCount} events
+                      {!isTop3 && " \u00b7 Trending up"}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+            {teamsToWatch.length === 0 && (
+              <p className="text-sm text-zinc-500 text-center py-4">
+                No prescout data available yet.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ──
+
 export default function DashboardPage() {
-  const { event, teams, loading } = useEvent();
+  const { event, teams, loading, isPrescout } = useEvent();
 
   // "/" keyboard shortcut to focus event search
   useEffect(() => {
@@ -103,6 +304,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <EventLoader />
+      <PrescoutBanner />
 
       <div className="flex-1 p-4 sm:p-6">
         {loading && (
@@ -139,7 +341,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {event && !loading && (
+        {event && !loading && isPrescout && <PrescoutDashboard />}
+
+        {event && !loading && !isPrescout && (
           <div className="space-y-6">
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

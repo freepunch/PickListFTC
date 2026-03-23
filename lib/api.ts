@@ -1,4 +1,4 @@
-import { Event, EventSearchResult, TeamReport } from "./types";
+import { Event, EventSearchResult, TeamReport, PrescoutTeamData } from "./types";
 
 const API_URL = "https://api.ftcscout.org/graphql";
 export const CURRENT_SEASON = 2025;
@@ -232,4 +232,91 @@ export async function getTeamReport(teamNumber: number): Promise<TeamReport> {
   }
 
   return data.teamByNumber;
+}
+
+// ── Prescout: batch-fetch season data for multiple teams ──
+
+const PRESCOUT_TEAM_QUERY = `
+  query GetPrescoutTeam($number: Int!) {
+    teamByNumber(number: $number) {
+      number
+      name
+      schoolName
+      quickStats(season: 2025) {
+        season
+        tot { value rank }
+        auto { value rank }
+        dc { value rank }
+        eg { value rank }
+        count
+      }
+      events(season: 2025) {
+        eventCode
+        event { name start }
+        stats {
+          ... on TeamEventStats2025 {
+            rank
+            rp
+            wins
+            losses
+            ties
+            qualMatchesPlayed
+            opr {
+              totalPointsNp
+              autoPoints
+              dcPoints
+            }
+            avg {
+              totalPointsNp
+              autoPoints
+              dcPoints
+              movementRp
+              goalRp
+              patternRp
+            }
+            max {
+              totalPointsNp
+              autoPoints
+              dcPoints
+            }
+            dev {
+              totalPointsNp
+              autoPoints
+              dcPoints
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+async function fetchTeamPrescout(teamNumber: number): Promise<PrescoutTeamData | null> {
+  try {
+    const data = await gqlFetch<{ teamByNumber: PrescoutTeamData | null }>(
+      PRESCOUT_TEAM_QUERY,
+      { number: teamNumber }
+    );
+    return data.teamByNumber ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getPrescoutData(
+  teamNumbers: number[],
+  _season: number = CURRENT_SEASON
+): Promise<PrescoutTeamData[]> {
+  const BATCH_SIZE = 8;
+  const results: PrescoutTeamData[] = [];
+
+  for (let i = 0; i < teamNumbers.length; i += BATCH_SIZE) {
+    const batch = teamNumbers.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(fetchTeamPrescout));
+    for (const r of batchResults) {
+      if (r) results.push(r);
+    }
+  }
+
+  return results;
 }

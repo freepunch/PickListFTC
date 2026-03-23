@@ -7,8 +7,9 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { Event, ProcessedTeam, TeamEventStats2025 } from "@/lib/types";
-import { getEventData } from "@/lib/api";
+import { Event, ProcessedTeam, TeamEventStats2025, PrescoutTeamData, PrescoutRankedTeam } from "@/lib/types";
+import { getEventData, getPrescoutData } from "@/lib/api";
+import { getPrescoutRanking } from "@/lib/calculations";
 
 interface EventState {
   event: Event | null;
@@ -19,6 +20,11 @@ interface EventState {
   eventCode: string;
   lastUpdated: number | null;
   highContrast: boolean;
+  isPrescout: boolean;
+  prescoutData: PrescoutTeamData[];
+  prescoutRanking: PrescoutRankedTeam[];
+  prescoutLoading: boolean;
+  showLiveToast: boolean;
 }
 
 interface EventContextValue extends EventState {
@@ -28,9 +34,15 @@ interface EventContextValue extends EventState {
   clearSelection: () => void;
   setEventCode: (code: string) => void;
   setHighContrast: (on: boolean) => void;
+  dismissLiveToast: () => void;
 }
 
 const EventContext = createContext<EventContextValue | null>(null);
+
+function isEventPrescout(event: Event): boolean {
+  if (!event.matches || event.matches.length === 0) return true;
+  return event.matches.every((m) => !m.hasBeenPlayed);
+}
 
 function processTeams(event: Event): ProcessedTeam[] {
   return event.teams
@@ -54,6 +66,11 @@ export function EventProvider({ children }: { children: ReactNode }) {
     eventCode: "",
     lastUpdated: null,
     highContrast: false,
+    isPrescout: false,
+    prescoutData: [],
+    prescoutRanking: [],
+    prescoutLoading: false,
+    showLiveToast: false,
   });
 
   const loadEvent = useCallback(async (code: string) => {
@@ -61,6 +78,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     try {
       const event = await getEventData(code);
       const teams = processTeams(event);
+      const prescout = isEventPrescout(event);
+
       setState((prev) => ({
         ...prev,
         event,
@@ -68,7 +87,24 @@ export function EventProvider({ children }: { children: ReactNode }) {
         loading: false,
         selectedTeams: [],
         lastUpdated: Date.now(),
+        isPrescout: prescout,
+        prescoutData: [],
+        prescoutRanking: [],
+        prescoutLoading: prescout,
+        showLiveToast: false,
       }));
+
+      if (prescout) {
+        const teamNumbers = event.teams.map((t) => t.teamNumber);
+        const prescoutData = await getPrescoutData(teamNumbers);
+        const prescoutRanking = getPrescoutRanking(prescoutData);
+        setState((prev) => ({
+          ...prev,
+          prescoutData,
+          prescoutRanking,
+          prescoutLoading: false,
+        }));
+      }
     } catch (err) {
       setState((prev) => ({
         ...prev,
@@ -85,13 +121,32 @@ export function EventProvider({ children }: { children: ReactNode }) {
     try {
       const event = await getEventData(code);
       const teams = processTeams(event);
+      const prescout = isEventPrescout(event);
+      const wasPrescout = state.isPrescout;
+
       setState((prev) => ({
         ...prev,
         event,
         teams,
         loading: false,
         lastUpdated: Date.now(),
+        isPrescout: prescout,
+        showLiveToast: wasPrescout && !prescout,
+        ...(!prescout ? { prescoutData: [], prescoutRanking: [], prescoutLoading: false } : {}),
+        ...(prescout ? { prescoutLoading: true } : {}),
       }));
+
+      if (prescout) {
+        const teamNumbers = event.teams.map((t) => t.teamNumber);
+        const prescoutData = await getPrescoutData(teamNumbers);
+        const prescoutRanking = getPrescoutRanking(prescoutData);
+        setState((prev) => ({
+          ...prev,
+          prescoutData,
+          prescoutRanking,
+          prescoutLoading: false,
+        }));
+      }
     } catch (err) {
       setState((prev) => ({
         ...prev,
@@ -100,7 +155,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.eventCode]);
+  }, [state.eventCode, state.isPrescout]);
 
   const toggleTeamSelection = useCallback((teamNumber: number) => {
     setState((prev) => {
@@ -123,6 +178,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, highContrast: on }));
   }, []);
 
+  const dismissLiveToast = useCallback(() => {
+    setState((prev) => ({ ...prev, showLiveToast: false }));
+  }, []);
+
   return (
     <EventContext.Provider
       value={{
@@ -133,6 +192,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         clearSelection,
         setEventCode,
         setHighContrast,
+        dismissLiveToast,
       }}
     >
       {children}
