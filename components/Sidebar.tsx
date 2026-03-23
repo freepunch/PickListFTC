@@ -7,7 +7,7 @@ import { useEvent } from "@/context/EventContext";
 
 const NAV_ITEMS = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Dashboard",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -135,8 +135,8 @@ export function Sidebar() {
           const isReport = item.href === "/report";
           const isActive = isReport
             ? pathname.startsWith("/report")
-            : item.href === "/"
-              ? pathname === "/"
+            : item.href === "/dashboard"
+              ? pathname === "/dashboard"
               : pathname.startsWith(item.href);
 
           if (isReport) {

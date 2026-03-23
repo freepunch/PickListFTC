@@ -236,7 +236,7 @@ export default function TeamReportPage({
 
   const handleEventClick = (entry: TeamEventEntry) => {
     loadEvent(entry.eventCode);
-    router.push("/");
+    router.push("/dashboard");
   };
 
   if (loading) {
@@ -262,7 +262,7 @@ export default function TeamReportPage({
         <p className="text-lg text-zinc-200 mb-1">
           {error || "Team not found"}
         </p>
-        <Link href="/" className="text-sm text-[var(--accent)] hover:underline mt-2">
+        <Link href="/dashboard" className="text-sm text-[var(--accent)] hover:underline mt-2">
           Back to Dashboard
         </Link>
       </div>
