@@ -44,7 +44,25 @@ function isEventPrescout(event: Event): boolean {
   return event.matches.every((m) => !m.hasBeenPlayed);
 }
 
-function processTeams(event: Event): ProcessedTeam[] {
+const EMPTY_STATS: TeamEventStats2025 = {
+  rank: 0, rp: 0, tb1: 0, tb2: 0,
+  wins: 0, losses: 0, ties: 0, dqs: 0, qualMatchesPlayed: 0,
+  opr: { totalPointsNp: 0, autoPoints: 0, dcPoints: 0, autoArtifactPoints: 0, autoPatternPoints: 0, dcArtifactPoints: 0, dcBasePoints: 0, dcPatternPoints: 0 },
+  avg: { totalPointsNp: 0, autoPoints: 0, dcPoints: 0, autoArtifactPoints: 0, autoPatternPoints: 0, dcArtifactPoints: 0, dcBasePoints: 0, dcPatternPoints: 0 },
+  max: { totalPointsNp: 0, autoPoints: 0, dcPoints: 0 },
+  dev: { totalPointsNp: 0, autoPoints: 0, dcPoints: 0 },
+};
+
+function processTeams(event: Event, prescout: boolean): ProcessedTeam[] {
+  if (prescout) {
+    // In prescout mode, no team has event stats yet — return stub entries so selectors work
+    return event.teams.map((tep, i) => ({
+      teamNumber: tep.teamNumber,
+      teamName: tep.team.name,
+      schoolName: tep.team.schoolName,
+      stats: { ...EMPTY_STATS, rank: i + 1 },
+    }));
+  }
   return event.teams
     .filter((tep) => tep.stats !== null)
     .map((tep) => ({
@@ -77,8 +95,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, loading: true, error: null, eventCode: code }));
     try {
       const event = await getEventData(code);
-      const teams = processTeams(event);
       const prescout = isEventPrescout(event);
+      const teams = processTeams(event, prescout);
 
       setState((prev) => ({
         ...prev,
@@ -120,8 +138,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const event = await getEventData(code);
-      const teams = processTeams(event);
       const prescout = isEventPrescout(event);
+      const teams = processTeams(event, prescout);
       const wasPrescout = state.isPrescout;
 
       setState((prev) => ({

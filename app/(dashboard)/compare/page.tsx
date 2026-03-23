@@ -13,13 +13,14 @@ import {
 } from "recharts";
 import { useEvent } from "@/context/EventContext";
 import { EventLoader } from "@/components/EventLoader";
+import { PrescoutBanner } from "@/components/PrescoutBanner";
 import {
   normalizeStats,
   complementarityScore,
   getConsistency,
   getWLT,
 } from "@/lib/calculations";
-import { ProcessedTeam, Match, TeamEventStats2025 } from "@/lib/types";
+import { ProcessedTeam, Match, TeamEventStats2025, PrescoutRankedTeam } from "@/lib/types";
 
 const TEAM_COLORS = [
   { stroke: "#3b82f6", fill: "rgba(59, 130, 246, 0.2)", label: "text-blue-400", bg: "bg-blue-500/15", dot: "bg-blue-500" },
@@ -37,12 +38,16 @@ function TeamSlot({
   allTeams,
   onSelect,
   onRemove,
+  isPrescout,
+  prescoutTeam,
 }: {
   index: number;
   team: ProcessedTeam | null;
   allTeams: ProcessedTeam[];
   onSelect: (teamNumber: number) => void;
   onRemove: () => void;
+  isPrescout?: boolean;
+  prescoutTeam?: PrescoutRankedTeam | null;
 }) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
@@ -83,7 +88,10 @@ function TeamSlot({
           </p>
           <p className="text-xs text-zinc-400 truncate">{team.teamName}</p>
           <p className="text-xs text-zinc-600">
-            Rank #{team.stats.rank} &middot; {getWLT(team.stats)}
+            {isPrescout && prescoutTeam
+              ? `Season Best OPR ${prescoutTeam.bestOpr.toFixed(1)} \u00b7 ${prescoutTeam.record.wins}-${prescoutTeam.record.losses}-${prescoutTeam.record.ties}`
+              : `Rank #${team.stats.rank} \u00b7 ${getWLT(team.stats)}`
+            }
           </p>
         </div>
         <Link
@@ -150,7 +158,7 @@ function TeamSlot({
   );
 }
 
-// ── Radar chart data ──
+// ── Radar chart data (live mode) ──
 
 function useRadarData(
   selectedData: ProcessedTeam[],
@@ -188,6 +196,41 @@ function useRadarData(
       return entry;
     });
   }, [selectedData, allTeams]);
+}
+
+// ── Radar chart data (prescout mode) ──
+
+function usePrescoutRadarData(
+  selectedTeams: PrescoutRankedTeam[],
+  allTeams: PrescoutRankedTeam[]
+) {
+  return useMemo(() => {
+    if (selectedTeams.length === 0 || allTeams.length === 0) return [];
+
+    const axes: {
+      label: string;
+      accessor: (t: PrescoutRankedTeam) => number;
+    }[] = [
+      { label: "Best Auto OPR", accessor: (t) => t.bestAutoOpr },
+      { label: "Best DC OPR", accessor: (t) => t.bestDcOpr },
+      { label: "Season Avg", accessor: (t) => t.seasonAvg },
+      { label: "Best Total OPR", accessor: (t) => t.bestOpr },
+      { label: "Events", accessor: (t) => t.eventCount },
+    ];
+
+    return axes.map((axis) => {
+      const values = allTeams.map(axis.accessor);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+
+      const entry: Record<string, string | number> = { stat: axis.label };
+      selectedTeams.forEach((team, i) => {
+        entry[`team${i}`] = Math.round(((axis.accessor(team) - min) / range) * 100);
+      });
+      return entry;
+    });
+  }, [selectedTeams, allTeams]);
 }
 
 // ── Complementarity grade ──
@@ -233,6 +276,12 @@ interface StatBarDef {
   format?: (v: number) => string;
 }
 
+interface PrescoutStatBarDef {
+  label: string;
+  accessor: (t: PrescoutRankedTeam) => number;
+  format?: (v: number) => string;
+}
+
 const STAT_GROUPS: { title: string; stats: StatBarDef[] }[] = [
   {
     title: "Auto",
@@ -269,6 +318,33 @@ const STAT_GROUPS: { title: string; stats: StatBarDef[] }[] = [
   },
 ];
 
+const PRESCOUT_STAT_GROUPS: { title: string; stats: PrescoutStatBarDef[] }[] = [
+  {
+    title: "Auto",
+    stats: [
+      { label: "Best Auto OPR", accessor: (t) => t.bestAutoOpr },
+      { label: "Season Auto Avg", accessor: (t) => t.seasonAutoAvg },
+    ],
+  },
+  {
+    title: "Driver-Controlled",
+    stats: [
+      { label: "Best DC OPR", accessor: (t) => t.bestDcOpr },
+      { label: "Season DC Avg", accessor: (t) => t.seasonDcAvg },
+    ],
+  },
+  {
+    title: "Overall",
+    stats: [
+      { label: "Best Total OPR", accessor: (t) => t.bestOpr },
+      { label: "Season Avg", accessor: (t) => t.seasonAvg },
+      { label: "Avg RP", accessor: (t) => t.avgRp },
+      { label: "Wins", accessor: (t) => t.record.wins },
+      { label: "Events", accessor: (t) => t.eventCount },
+    ],
+  },
+];
+
 function StatComparisonBar({
   stat,
   teams,
@@ -290,6 +366,53 @@ function StatComparisonBar({
           const isBest = isConsistency
             ? val === Math.min(...values)
             : val === Math.max(...values);
+          const color = TEAM_COLORS[i];
+
+          return (
+            <div key={team.teamNumber} className="flex items-center gap-2">
+              <div className="w-32 flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden relative">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.max(pct, 2)}%`,
+                    backgroundColor: color.stroke,
+                    opacity: isBest ? 1 : 0.5,
+                  }}
+                />
+              </div>
+              <span
+                className={`font-mono text-xs w-16 text-right shrink-0 ${
+                  isBest ? "text-white font-medium" : "text-zinc-500"
+                }`}
+              >
+                {stat.format ? stat.format(val) : val.toFixed(1)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PrescoutStatComparisonBar({
+  stat,
+  teams,
+}: {
+  stat: PrescoutStatBarDef;
+  teams: PrescoutRankedTeam[];
+}) {
+  const values = teams.map((t) => stat.accessor(t));
+  const maxVal = Math.max(...values, 0.01);
+
+  return (
+    <div className="py-2">
+      <p className="text-xs text-zinc-500 mb-1.5">{stat.label}</p>
+      <div className="space-y-1">
+        {teams.map((team, i) => {
+          const val = values[i];
+          const pct = (val / maxVal) * 100;
+          const isBest = val === Math.max(...values);
           const color = TEAM_COLORS[i];
 
           return (
@@ -374,10 +497,31 @@ function getSharedMatches(
   return shared;
 }
 
+// ── Prescout complementarity (using season best OPR) ──
+
+function prescoutComplementarityScore(a: PrescoutRankedTeam, b: PrescoutRankedTeam): number {
+  const aTotal = a.bestOpr || 1;
+  const bTotal = b.bestOpr || 1;
+  const aAutoRatio = a.bestAutoOpr / aTotal;
+  const aDcRatio = a.bestDcOpr / aTotal;
+  const bAutoRatio = b.bestAutoOpr / bTotal;
+  const bDcRatio = b.bestDcOpr / bTotal;
+
+  const autoDiff = Math.abs(aAutoRatio - bAutoRatio);
+  const dcDiff = Math.abs(aDcRatio - bDcRatio);
+  const profileDivergence = (autoDiff + dcDiff) / 2;
+
+  const combinedOpr = a.bestOpr + b.bestOpr;
+  const strengthBonus = Math.min(combinedOpr / 200, 1);
+
+  const raw = profileDivergence * 0.6 + strengthBonus * 0.4;
+  return Math.round(Math.min(raw * 100, 100));
+}
+
 // ── Main page ──
 
 export default function ComparePage() {
-  const { teams, event, loading, selectedTeams, toggleTeamSelection, clearSelection } =
+  const { teams, event, loading, selectedTeams, toggleTeamSelection, clearSelection, isPrescout, prescoutRanking } =
     useEvent();
 
   // Local slot state: initialized from context selectedTeams
@@ -410,10 +554,17 @@ export default function ComparePage() {
     .map((num) => teams.find((t) => t.teamNumber === num))
     .filter((t): t is ProcessedTeam => t !== undefined);
 
+  const selectedPrescoutData = filledSlots
+    .map((num) => prescoutRanking.find((t) => t.teamNumber === num))
+    .filter((t): t is PrescoutRankedTeam => t !== undefined);
+
   const radarData = useRadarData(selectedData, teams);
+  const prescoutRadarData = usePrescoutRadarData(selectedPrescoutData, prescoutRanking);
+
+  const activeRadarData = isPrescout ? prescoutRadarData : radarData;
+  const activeSelectedForRadar = isPrescout ? selectedPrescoutData : selectedData;
 
   const handleSlotSelect = (index: number, teamNumber: number) => {
-    // Add to context
     if (!selectedTeams.includes(teamNumber)) {
       toggleTeamSelection(teamNumber);
     }
@@ -432,7 +583,6 @@ export default function ComparePage() {
     setSlots((prev) => {
       const next = [...prev];
       next[index] = null;
-      // Remove trailing empty slots beyond 2
       while (next.length > 2 && next[next.length - 1] === null) {
         next.pop();
       }
@@ -448,21 +598,24 @@ export default function ComparePage() {
 
   const sharedMatches = useMemo(
     () =>
-      event && filledSlots.length >= 2
+      event && filledSlots.length >= 2 && !isPrescout
         ? getSharedMatches(filledSlots, event.matches)
         : [],
-    [event, filledSlots]
+    [event, filledSlots, isPrescout]
   );
 
   const compScore =
-    selectedData.length === 2
+    selectedData.length === 2 && !isPrescout
       ? complementarityScore(selectedData[0].stats, selectedData[1].stats)
-      : null;
+      : selectedPrescoutData.length === 2 && isPrescout
+        ? prescoutComplementarityScore(selectedPrescoutData[0], selectedPrescoutData[1])
+        : null;
   const compGrade = compScore !== null ? getComplementarityGrade(compScore) : null;
 
   return (
     <div className="min-h-screen flex flex-col">
       <EventLoader />
+      <PrescoutBanner />
 
       <div className="flex-1 p-6">
         {loading && (
@@ -505,6 +658,7 @@ export default function ComparePage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold text-zinc-200">
                   Compare Teams
+                  {isPrescout && <span className="text-xs text-blue-400 ml-2 font-normal">Season Data</span>}
                 </h2>
                 {slots.length < MAX_SLOTS && (
                   <button
@@ -533,12 +687,18 @@ export default function ComparePage() {
                     )}
                     onSelect={(num) => handleSlotSelect(i, num)}
                     onRemove={() => handleSlotRemove(i)}
+                    isPrescout={isPrescout}
+                    prescoutTeam={
+                      slot !== null
+                        ? prescoutRanking.find((t) => t.teamNumber === slot) ?? null
+                        : null
+                    }
                   />
                 ))}
               </div>
             </div>
 
-            {selectedData.length < 2 && (
+            {((isPrescout ? selectedPrescoutData.length : selectedData.length) < 2) && (
               <div className="text-center py-16 text-zinc-500">
                 <p className="text-sm">
                   Select at least 2 teams above to see the comparison.
@@ -551,7 +711,7 @@ export default function ComparePage() {
               </div>
             )}
 
-            {selectedData.length >= 2 && (
+            {(isPrescout ? selectedPrescoutData.length : selectedData.length) >= 2 && (
               <>
                 {/* Complementarity card + radar in a row */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -575,6 +735,9 @@ export default function ComparePage() {
                       <p className="text-xs text-zinc-500 leading-relaxed max-w-[200px]">
                         {compGrade.explanation}
                       </p>
+                      {isPrescout && (
+                        <p className="text-[10px] text-zinc-600 mt-2">Based on season best OPR</p>
+                      )}
                     </div>
                   )}
 
@@ -586,10 +749,10 @@ export default function ComparePage() {
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-semibold text-zinc-200">
-                        Stat Profile
+                        {isPrescout ? "Season Profile" : "Stat Profile"}
                       </h3>
                       <div className="flex items-center gap-4">
-                        {selectedData.map((team, i) => (
+                        {activeSelectedForRadar.map((team, i) => (
                           <div
                             key={team.teamNumber}
                             className="flex items-center gap-1.5"
@@ -606,7 +769,7 @@ export default function ComparePage() {
                     </div>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                        <RadarChart data={activeRadarData} cx="50%" cy="50%" outerRadius="75%">
                           <PolarGrid stroke="#27272a" />
                           <PolarAngleAxis
                             dataKey="stat"
@@ -618,10 +781,10 @@ export default function ComparePage() {
                             tick={false}
                             axisLine={false}
                           />
-                          {selectedData.map((_, i) => (
+                          {activeSelectedForRadar.map((_, i) => (
                             <Radar
                               key={i}
-                              name={`Team ${selectedData[i].teamNumber}`}
+                              name={`Team ${activeSelectedForRadar[i].teamNumber}`}
                               dataKey={`team${i}`}
                               stroke={TEAM_COLORS[i].stroke}
                               fill={TEAM_COLORS[i].fill}
@@ -652,10 +815,10 @@ export default function ComparePage() {
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <div className="flex items-center justify-between mb-5">
                     <h3 className="text-sm font-semibold text-zinc-200">
-                      Stat Breakdown
+                      {isPrescout ? "Season Stat Breakdown" : "Stat Breakdown"}
                     </h3>
                     <div className="flex items-center gap-4">
-                      {selectedData.map((team, i) => (
+                      {activeSelectedForRadar.map((team, i) => (
                         <div
                           key={team.teamNumber}
                           className="flex items-center gap-1.5"
@@ -673,135 +836,167 @@ export default function ComparePage() {
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    {STAT_GROUPS.map((group) => (
-                      <div key={group.title}>
-                        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3 pb-2 border-b border-zinc-800">
-                          {group.title}
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-                          {group.stats.map((stat) => (
-                            <StatComparisonBar
-                              key={stat.label}
-                              stat={stat}
-                              teams={selectedData}
-                            />
-                          ))}
+                  {isPrescout ? (
+                    <div className="space-y-6">
+                      {PRESCOUT_STAT_GROUPS.map((group) => (
+                        <div key={group.title}>
+                          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3 pb-2 border-b border-zinc-800">
+                            {group.title}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                            {group.stats.map((stat) => (
+                              <PrescoutStatComparisonBar
+                                key={stat.label}
+                                stat={stat}
+                                teams={selectedPrescoutData}
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Shared match history */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="text-sm font-semibold text-zinc-200 mb-4">
-                    Shared Match History
-                  </h3>
-                  {sharedMatches.length === 0 ? (
-                    <div className="text-center py-8">
-                      <svg
-                        className="w-8 h-8 text-zinc-700 mx-auto mb-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-sm text-zinc-600">
-                        No shared matches between these teams
-                      </p>
+                      ))}
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
-                            <th className="text-left py-2 pr-4">Match</th>
-                            <th className="text-left py-2 pr-4">Type</th>
-                            {selectedData.map((team, i) => (
-                              <th
-                                key={team.teamNumber}
-                                className="text-right py-2 pr-4"
-                              >
-                                <span className={TEAM_COLORS[i].label}>
-                                  {team.teamNumber}
-                                </span>
-                              </th>
+                    <div className="space-y-6">
+                      {STAT_GROUPS.map((group) => (
+                        <div key={group.title}>
+                          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3 pb-2 border-b border-zinc-800">
+                            {group.title}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                            {group.stats.map((stat) => (
+                              <StatComparisonBar
+                                key={stat.label}
+                                stat={stat}
+                                teams={selectedData}
+                              />
                             ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sharedMatches.map((sm) => (
-                            <tr
-                              key={sm.matchId}
-                              className="border-b border-zinc-800/30 last:border-0"
-                            >
-                              <td className="py-2.5 pr-4 font-mono text-zinc-400 text-xs">
-                                Q{sm.matchId}
-                              </td>
-                              <td className="py-2.5 pr-4">
-                                <span
-                                  className={`text-xs px-2 py-0.5 rounded-full ${
-                                    sm.sameAlliance
-                                      ? "bg-emerald-500/15 text-emerald-400"
-                                      : "bg-amber-500/15 text-amber-400"
-                                  }`}
-                                >
-                                  {sm.sameAlliance ? "Allies" : "Opponents"}
-                                </span>
-                              </td>
-                              {selectedData.map((team, i) => {
-                                const tr = sm.teams.find(
-                                  (t) => t.teamNumber === team.teamNumber
-                                );
-                                if (!tr) {
-                                  return (
-                                    <td
-                                      key={team.teamNumber}
-                                      className="py-2.5 pr-4 text-right text-zinc-600 text-xs"
-                                    >
-                                      —
-                                    </td>
-                                  );
-                                }
-                                return (
-                                  <td
-                                    key={team.teamNumber}
-                                    className="py-2.5 pr-4 text-right"
-                                  >
-                                    <div className="flex items-center justify-end gap-2">
-                                      <span
-                                        className={`inline-block w-2 h-2 rounded-full ${
-                                          tr.alliance === "Red"
-                                            ? "bg-red-500"
-                                            : "bg-blue-500"
-                                        }`}
-                                      />
-                                      <span className="font-mono text-xs text-zinc-200">
-                                        {tr.totalPointsNp.toFixed(0)}
-                                      </span>
-                                      <span
-                                        className={`text-xs font-medium px-1 py-0.5 rounded ${
-                                          tr.won
-                                            ? "bg-emerald-500/15 text-emerald-400"
-                                            : "bg-red-500/15 text-red-400"
-                                        }`}
-                                      >
-                                        {tr.won ? "W" : "L"}
-                                      </span>
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
+
+                {/* Shared match history (live only) */}
+                {!isPrescout && (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                    <h3 className="text-sm font-semibold text-zinc-200 mb-4">
+                      Shared Match History
+                    </h3>
+                    {sharedMatches.length === 0 ? (
+                      <div className="text-center py-8">
+                        <svg
+                          className="w-8 h-8 text-zinc-700 mx-auto mb-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-sm text-zinc-600">
+                          No shared matches between these teams
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+                              <th className="text-left py-2 pr-4">Match</th>
+                              <th className="text-left py-2 pr-4">Type</th>
+                              {selectedData.map((team, i) => (
+                                <th
+                                  key={team.teamNumber}
+                                  className="text-right py-2 pr-4"
+                                >
+                                  <span className={TEAM_COLORS[i].label}>
+                                    {team.teamNumber}
+                                  </span>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sharedMatches.map((sm) => (
+                              <tr
+                                key={sm.matchId}
+                                className="border-b border-zinc-800/30 last:border-0"
+                              >
+                                <td className="py-2.5 pr-4 font-mono text-zinc-400 text-xs">
+                                  Q{sm.matchId}
+                                </td>
+                                <td className="py-2.5 pr-4">
+                                  <span
+                                    className={`text-xs px-2 py-0.5 rounded-full ${
+                                      sm.sameAlliance
+                                        ? "bg-emerald-500/15 text-emerald-400"
+                                        : "bg-amber-500/15 text-amber-400"
+                                    }`}
+                                  >
+                                    {sm.sameAlliance ? "Allies" : "Opponents"}
+                                  </span>
+                                </td>
+                                {selectedData.map((team, i) => {
+                                  const tr = sm.teams.find(
+                                    (t) => t.teamNumber === team.teamNumber
+                                  );
+                                  if (!tr) {
+                                    return (
+                                      <td
+                                        key={team.teamNumber}
+                                        className="py-2.5 pr-4 text-right text-zinc-600 text-xs"
+                                      >
+                                        —
+                                      </td>
+                                    );
+                                  }
+                                  return (
+                                    <td
+                                      key={team.teamNumber}
+                                      className="py-2.5 pr-4 text-right"
+                                    >
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span
+                                          className={`inline-block w-2 h-2 rounded-full ${
+                                            tr.alliance === "Red"
+                                              ? "bg-red-500"
+                                              : "bg-blue-500"
+                                          }`}
+                                        />
+                                        <span className="font-mono text-xs text-zinc-200">
+                                          {tr.totalPointsNp.toFixed(0)}
+                                        </span>
+                                        <span
+                                          className={`text-xs font-medium px-1 py-0.5 rounded ${
+                                            tr.won
+                                              ? "bg-emerald-500/15 text-emerald-400"
+                                              : "bg-red-500/15 text-red-400"
+                                          }`}
+                                        >
+                                          {tr.won ? "W" : "L"}
+                                        </span>
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Prescout note about no match history */}
+                {isPrescout && (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
+                    <p className="text-sm text-zinc-500">
+                      Shared match history will be available once the event starts.
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </div>
