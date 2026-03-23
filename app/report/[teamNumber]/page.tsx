@@ -235,7 +235,7 @@ export default function TeamReportPage({
   }, [allStats]);
 
   const handleEventClick = (entry: TeamEventEntry) => {
-    loadEvent(entry.eventCode, 2025);
+    loadEvent(entry.eventCode);
     router.push("/");
   };
 

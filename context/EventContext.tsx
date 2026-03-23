@@ -22,7 +22,7 @@ interface EventState {
 }
 
 interface EventContextValue extends EventState {
-  loadEvent: (code: string, season?: number) => Promise<void>;
+  loadEvent: (code: string) => Promise<void>;
   refreshEvent: () => Promise<void>;
   toggleTeamSelection: (teamNumber: number) => void;
   clearSelection: () => void;
@@ -56,10 +56,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     highContrast: false,
   });
 
-  const loadEvent = useCallback(async (code: string, season: number = 2025) => {
+  const loadEvent = useCallback(async (code: string) => {
     setState((prev) => ({ ...prev, loading: true, error: null, eventCode: code }));
     try {
-      const event = await getEventData(code, season);
+      const event = await getEventData(code);
       const teams = processTeams(event);
       setState((prev) => ({
         ...prev,

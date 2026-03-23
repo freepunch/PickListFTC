@@ -1,6 +1,7 @@
 import { Event, EventSearchResult, TeamReport } from "./types";
 
 const API_URL = "https://api.ftcscout.org/graphql";
+export const CURRENT_SEASON = 2025;
 
 async function gqlFetch<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const res = await fetch(API_URL, {
@@ -116,16 +117,15 @@ const EVENT_QUERY = `
 // ── Fetch functions ──
 
 export async function getEventData(
-  eventCode: string,
-  season: number = 2025
+  eventCode: string
 ): Promise<Event> {
   const data = await gqlFetch<{ eventByCode: Event }>(EVENT_QUERY, {
     code: eventCode,
-    season,
+    season: CURRENT_SEASON,
   });
 
   if (!data.eventByCode) {
-    throw new Error(`Event "${eventCode}" not found for season ${season}`);
+    throw new Error(`Event "${eventCode}" not found for season ${CURRENT_SEASON}`);
   }
 
   return data.eventByCode;
@@ -212,12 +212,11 @@ const EVENT_SEARCH_QUERY = `
 `;
 
 export async function searchEvents(
-  searchText: string,
-  season: number = 2025
+  searchText: string
 ): Promise<EventSearchResult[]> {
   const data = await gqlFetch<{ eventsSearch: EventSearchResult[] }>(
     EVENT_SEARCH_QUERY,
-    { season, searchText }
+    { season: CURRENT_SEASON, searchText }
   );
   return data.eventsSearch ?? [];
 }

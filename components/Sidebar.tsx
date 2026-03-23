@@ -286,6 +286,19 @@ export function Sidebar() {
             <p className="text-xs text-zinc-600">No event loaded</p>
           )
         )}
+        {!collapsed && (
+          <p className="text-xs text-zinc-500 mt-3">
+            Built by{" "}
+            <a
+              href="https://ftrobotics.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-400 transition-colors"
+            >
+              First Try #21364
+            </a>
+          </p>
+        )}
       </div>
     </aside>
   );

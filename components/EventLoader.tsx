@@ -13,7 +13,6 @@ export function focusEventInput() {
 
 interface RecentEvent {
   code: string;
-  season: number;
   name: string;
   timestamp: number;
 }
@@ -33,7 +32,7 @@ function getRecentEvents(): RecentEvent[] {
 
 function saveRecentEvent(entry: Omit<RecentEvent, "timestamp">) {
   const existing = getRecentEvents().filter(
-    (e) => !(e.code === entry.code && e.season === entry.season)
+    (e) => e.code !== entry.code
   );
   const updated = [{ ...entry, timestamp: Date.now() }, ...existing].slice(
     0,
@@ -55,7 +54,6 @@ function formatDate(iso: string): string {
 export function EventLoader() {
   const { loadEvent, loading, error, event, eventCode, setEventCode } =
     useEvent();
-  const [season, setSeason] = useState(2025);
   const [showDropdown, setShowDropdown] = useState(false);
   const [recent, setRecent] = useState<RecentEvent[]>([]);
   const [searchResults, setSearchResults] = useState<EventSearchResult[]>([]);
@@ -80,10 +78,10 @@ export function EventLoader() {
 
   useEffect(() => {
     if (event) {
-      saveRecentEvent({ code: eventCode, season, name: event.name });
+      saveRecentEvent({ code: eventCode, name: event.name });
       setRecent(getRecentEvents());
     }
-  }, [event, eventCode, season]);
+  }, [event, eventCode]);
 
   // Click-outside to close dropdown
   useEffect(() => {
@@ -113,7 +111,7 @@ export function EventLoader() {
 
       debounceRef.current = setTimeout(async () => {
         try {
-          const results = await searchEvents(trimmed, season);
+          const results = await searchEvents(trimmed);
           setSearchResults(results);
           setHighlightIdx(-1);
           setShowDropdown(true);
@@ -124,7 +122,7 @@ export function EventLoader() {
         }
       }, DEBOUNCE_MS);
     },
-    [season]
+    []
   );
 
   const handleInputChange = (value: string) => {
@@ -142,13 +140,11 @@ export function EventLoader() {
     }
   };
 
-  const selectEvent = (code: string, eventSeason?: number) => {
-    const s = eventSeason ?? season;
+  const selectEvent = (code: string) => {
     setEventCode(code);
-    setSeason(s);
     setShowDropdown(false);
     setHighlightIdx(-1);
-    loadEvent(code, s);
+    loadEvent(code);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -158,7 +154,7 @@ export function EventLoader() {
 
     if (isEventCode(trimmed)) {
       setShowDropdown(false);
-      loadEvent(trimmed, season);
+      loadEvent(trimmed);
     } else if (searchResults.length > 0) {
       const idx = highlightIdx >= 0 ? highlightIdx : 0;
       selectEvent(searchResults[idx].code);
@@ -185,7 +181,7 @@ export function EventLoader() {
         selectEvent(searchResults[highlightIdx].code);
       } else {
         const entry = recent[highlightIdx];
-        selectEvent(entry.code, entry.season);
+        selectEvent(entry.code);
       }
     } else if (e.key === "Escape") {
       setShowDropdown(false);
@@ -249,16 +245,15 @@ export function EventLoader() {
               </p>
               {recent.map((entry, idx) => (
                 <button
-                  key={`${entry.code}-${entry.season}`}
+                  key={entry.code}
                   type="button"
-                  onClick={() => selectEvent(entry.code, entry.season)}
+                  onClick={() => selectEvent(entry.code)}
                   className={`w-full text-left px-3 py-2.5 transition-colors flex items-center justify-between group ${
                     highlightIdx === idx ? "bg-zinc-700/70" : "hover:bg-zinc-700/50"
                   }`}
                 >
                   <div className="min-w-0">
                     <span className="font-mono text-sm text-white">{entry.code}</span>
-                    <span className="text-xs text-zinc-500 ml-2">{entry.season}</span>
                     <p className="text-xs text-zinc-500 truncate mt-0.5">{entry.name}</p>
                   </div>
                   <svg
@@ -333,20 +328,6 @@ export function EventLoader() {
           )}
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-zinc-500 mb-1.5">
-            Season
-          </label>
-          <input
-            type="number"
-            value={season}
-            onChange={(e) => setSeason(Number(e.target.value))}
-            className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
-              w-24 font-mono focus:outline-none focus:border-[var(--accent)]
-              focus:ring-1 focus:ring-[var(--accent)]/30 transition-colors"
-          />
-        </div>
-
         <button
           type="submit"
           disabled={loading || !eventCode.trim()}
@@ -377,7 +358,7 @@ export function EventLoader() {
               type="button"
               onClick={() => {
                 const trimmed = eventCode.trim();
-                if (trimmed) loadEvent(trimmed, season);
+                if (trimmed) loadEvent(trimmed);
               }}
               className="text-xs font-medium text-zinc-400 hover:text-white bg-zinc-800 border border-zinc-700
                 rounded-md px-2 py-1 transition-colors shrink-0"
