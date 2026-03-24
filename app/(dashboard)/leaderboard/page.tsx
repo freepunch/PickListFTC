@@ -14,6 +14,12 @@ import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { ComparisonTray } from "@/components/ComparisonTray";
 import { getWLT } from "@/lib/calculations";
 import { ProcessedTeam, Match, Alliance, PrescoutRankedTeam, TeamEventEntry, TeamEventStats2025 } from "@/lib/types";
+import { penaltyP75 } from "@/lib/calculations";
+import { PenaltyBadge } from "@/components/PenaltyBadge";
+import { NotesBadge } from "@/components/NotesBadge";
+import { NoteForm } from "@/components/NoteForm";
+import { useNotes } from "@/context/NotesContext";
+import { tagColorClass } from "@/lib/notes";
 
 // ── Tab / Column definitions (live mode) ──
 
@@ -25,6 +31,13 @@ interface ColDef {
   align: "left" | "right";
   getValue: (t: ProcessedTeam) => string | number;
   getRaw: (t: ProcessedTeam) => number | string;
+  tooltip?: string;
+}
+
+function penaltyColor(avg: number): string {
+  if (avg < 5) return "text-green-400";
+  if (avg <= 15) return "text-yellow-400";
+  return "text-red-400";
 }
 
 const SHARED_LEFT: ColDef[] = [
@@ -77,6 +90,14 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
         align: "right",
         getValue: (t) => t.stats.avg.totalPointsNp.toFixed(1),
         getRaw: (t) => t.stats.avg.totalPointsNp,
+      },
+      {
+        key: "penalties",
+        label: "Penalties",
+        align: "right",
+        tooltip: "Avg penalty points committed per match. Hover cell for major/minor breakdown.",
+        getValue: (t) => (t.stats.avg.penaltyPointsCommitted ?? 0).toFixed(1),
+        getRaw: (t) => t.stats.avg.penaltyPointsCommitted ?? 0,
       },
     ],
   },
@@ -228,6 +249,14 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
           `${((t.stats.avg.patternRp ?? 0) * 100).toFixed(0)}%`,
         getRaw: (t) => t.stats.avg.patternRp ?? 0,
       },
+      {
+        key: "penalties",
+        label: "Penalties",
+        align: "right",
+        tooltip: "Avg penalty points committed per match. Hover cell for major/minor breakdown.",
+        getValue: (t) => (t.stats.avg.penaltyPointsCommitted ?? 0).toFixed(1),
+        getRaw: (t) => t.stats.avg.penaltyPointsCommitted ?? 0,
+      },
     ],
   },
 ];
@@ -240,6 +269,7 @@ interface PrescoutColDef {
   key: string;
   label: string;
   align: "left" | "right";
+  tooltip?: string;
   getValue: (t: PrescoutRankedTeam) => string | number;
   getRaw: (t: PrescoutRankedTeam) => number | string;
 }
@@ -372,7 +402,12 @@ function PrescoutExpandedDetail({ team }: { team: PrescoutRankedTeam }) {
     .sort((a, b) => new Date(a.event.start).getTime() - new Date(b.event.start).getTime());
 
   if (validEvents.length === 0) {
-    return <p className="text-sm text-zinc-500">No event data available.</p>;
+    return (
+      <>
+        <p className="text-sm text-zinc-500">No event data available.</p>
+        <InlineNotesSection teamNumber={team.teamNumber} />
+      </>
+    );
   }
 
   const sparkData = validEvents.map((e, i) => ({
@@ -382,6 +417,7 @@ function PrescoutExpandedDetail({ team }: { team: PrescoutRankedTeam }) {
   }));
 
   return (
+    <>
     <div className="flex gap-6 flex-col lg:flex-row">
       {/* Sparkline */}
       <div className="lg:w-64 shrink-0">
@@ -458,6 +494,8 @@ function PrescoutExpandedDetail({ team }: { team: PrescoutRankedTeam }) {
         </table>
       </div>
     </div>
+    <InlineNotesSection teamNumber={team.teamNumber} />
+    </>
   );
 }
 
@@ -472,8 +510,11 @@ export default function LeaderboardPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
+  const [hasNotesFilter, setHasNotesFilter] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { teamHasNotes, exportNotes, importNotes } = useNotes();
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const currentTab = TABS.find((t) => t.id === activeTab)!;
   const columns = currentTab.columns;
@@ -513,13 +554,12 @@ export default function LeaderboardPage() {
   // ── Live mode filtering/sorting ──
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
-    if (!q) return teams;
-    return teams.filter(
-      (t) =>
-        t.teamNumber.toString().includes(q) ||
-        t.teamName.toLowerCase().includes(q)
-    );
-  }, [teams, debouncedSearch]);
+    return teams.filter((t) => {
+      if (q && !t.teamNumber.toString().includes(q) && !t.teamName.toLowerCase().includes(q)) return false;
+      if (hasNotesFilter && !teamHasNotes(t.teamNumber)) return false;
+      return true;
+    });
+  }, [teams, debouncedSearch, hasNotesFilter, teamHasNotes]);
 
   const sorted = useMemo(() => {
     const col = columns.find((c) => c.key === sortKey);
@@ -539,13 +579,12 @@ export default function LeaderboardPage() {
   // ── Prescout mode filtering/sorting ──
   const psFiltered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
-    if (!q) return prescoutRanking;
-    return prescoutRanking.filter(
-      (t) =>
-        t.teamNumber.toString().includes(q) ||
-        t.teamName.toLowerCase().includes(q)
-    );
-  }, [prescoutRanking, debouncedSearch]);
+    return prescoutRanking.filter((t) => {
+      if (q && !t.teamNumber.toString().includes(q) && !t.teamName.toLowerCase().includes(q)) return false;
+      if (hasNotesFilter && !teamHasNotes(t.teamNumber)) return false;
+      return true;
+    });
+  }, [prescoutRanking, debouncedSearch, hasNotesFilter, teamHasNotes]);
 
   const psSorted = useMemo(() => {
     const col = psColumns.find((c) => c.key === sortKey);
@@ -577,6 +616,8 @@ export default function LeaderboardPage() {
     setSortAsc(true);
     setExpandedTeam(null);
   };
+
+  const penaltyThreshold = useMemo(() => penaltyP75(teams), [teams]);
 
   const isNumericCol = (key: string) =>
     key !== "name" && key !== "wlt" && key !== "trend";
@@ -629,36 +670,102 @@ export default function LeaderboardPage() {
               ))}
             </div>
 
-            {/* Search */}
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+            {/* Search + filter row */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Filter by team # or name..."
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white
+                    placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700
+                    focus:ring-1 focus:ring-zinc-700/50 transition-colors"
+                />
+                {search && (
+                  <button
+                    onClick={() => { setSearch(""); setDebouncedSearch(""); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Has Notes toggle */}
+              <button
+                onClick={() => setHasNotesFilter((f) => !f)}
+                title={hasNotesFilter ? "Show all teams" : "Show only teams with notes"}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all whitespace-nowrap ${
+                  hasNotesFilter
+                    ? "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30"
+                    : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"
+                }`}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Filter by team # or name..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white
-                  placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700
-                  focus:ring-1 focus:ring-zinc-700/50 transition-colors"
-              />
-              {search && (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2 5.5A2.5 2.5 0 014.5 3h15A2.5 2.5 0 0122 5.5v10A2.5 2.5 0 0119.5 18H13l-4 3v-3H4.5A2.5 2.5 0 012 15.5v-10z" />
+                </svg>
+                <span className="hidden sm:inline">Has Notes</span>
+              </button>
+
+              {/* Export notes */}
+              {event && (
                 <button
-                  onClick={() => { setSearch(""); setDebouncedSearch(""); }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  onClick={exportNotes}
+                  title="Export scout notes as JSON"
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-500 border border-zinc-800 bg-zinc-900 hover:text-zinc-300 transition-colors whitespace-nowrap"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
+                  <span className="hidden sm:inline">Export</span>
                 </button>
+              )}
+
+              {/* Import notes */}
+              {event && (
+                <>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (typeof ev.target?.result === "string") {
+                          importNotes(ev.target.result);
+                        }
+                      };
+                      reader.readAsText(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    onClick={() => importInputRef.current?.click()}
+                    title="Import scout notes from JSON"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-500 border border-zinc-800 bg-zinc-900 hover:text-zinc-300 transition-colors whitespace-nowrap"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <span className="hidden sm:inline">Import</span>
+                  </button>
+                </>
               )}
             </div>
 
@@ -683,6 +790,7 @@ export default function LeaderboardPage() {
                           <th
                             key={col.key}
                             onClick={() => handleSort(col.key)}
+                            title={col.tooltip}
                             className={`px-3 py-3 text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors whitespace-nowrap ${
                               col.align === "right" ? "text-right" : "text-left"
                             } ${
@@ -749,6 +857,11 @@ export default function LeaderboardPage() {
                                       <Link href={`/report/${team.teamNumber}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
                                         {val}
                                       </Link>
+                                    ) : col.key === "name" ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        {val}
+                                        <NotesBadge teamNumber={team.teamNumber} />
+                                      </span>
                                     ) : val}
                                   </td>
                                 );
@@ -846,7 +959,23 @@ export default function LeaderboardPage() {
                                         : "text-zinc-200"
                                     }`}
                                   >
-                                    {col.getValue(team)}
+                                    {col.key === "name" ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        {col.getValue(team)}
+                                        <PenaltyBadge
+                                          avg={team.stats.avg.penaltyPointsCommitted ?? 0}
+                                          threshold={penaltyThreshold}
+                                        />
+                                        <NotesBadge teamNumber={team.teamNumber} />
+                                      </span>
+                                    ) : col.key === "penalties" ? (
+                                      <span
+                                        className={penaltyColor(team.stats.avg.penaltyPointsCommitted ?? 0)}
+                                        title={`${(team.stats.avg.majorsCommittedPoints ?? 0).toFixed(1)} major avg, ${(team.stats.avg.minorsCommittedPoints ?? 0).toFixed(1)} minor avg`}
+                                      >
+                                        {col.getValue(team)}
+                                      </span>
+                                    ) : col.getValue(team)}
                                   </td>
                                 );
                               })}
@@ -890,6 +1019,74 @@ export default function LeaderboardPage() {
   );
 }
 
+// ── Inline notes section (used in both expanded panels) ──
+
+function InlineNotesSection({ teamNumber }: { teamNumber: number }) {
+  const { notesForTeam, deleteNote } = useNotes();
+  const [formOpen, setFormOpen] = useState(false);
+  const teamNotes = notesForTeam(teamNumber);
+
+  return (
+    <div className="mt-4 pt-3 border-t border-zinc-800/50">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+          Scout Notes {teamNotes.length > 0 && `(${teamNotes.length})`}
+        </p>
+        {!formOpen && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setFormOpen(true); }}
+            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-[var(--accent)] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Note
+          </button>
+        )}
+      </div>
+      {formOpen && (
+        <div className="mb-3">
+          <NoteForm teamNumber={teamNumber} onClose={() => setFormOpen(false)} />
+        </div>
+      )}
+      {teamNotes.length > 0 && (
+        <div className="space-y-1.5">
+          {teamNotes.map((note) => (
+            <div key={note.id} className="bg-zinc-900/60 rounded-lg px-2.5 py-2 group/note">
+              {note.text && (
+                <p className="text-xs text-zinc-300 mb-1.5">{note.text}</p>
+              )}
+              {note.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {note.tags.map((tag) => (
+                    <span key={tag} className={`text-[10px] px-1.5 py-0.5 rounded-full ${tagColorClass(tag)}`}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-zinc-600">
+                  {new Date(note.timestamp).toLocaleString(undefined, {
+                    month: "short", day: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                  className="text-[10px] text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover/note:opacity-100"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Expanded row detail (live mode) ──
 
 function ExpandedDetail({
@@ -903,7 +1100,10 @@ function ExpandedDetail({
 
   if (results.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">No match data available.</p>
+      <>
+        <p className="text-sm text-zinc-500">No match data available.</p>
+        <InlineNotesSection teamNumber={team.teamNumber} />
+      </>
     );
   }
 
@@ -913,6 +1113,7 @@ function ExpandedDetail({
   }));
 
   return (
+    <>
     <div className="flex gap-6 flex-col lg:flex-row">
       {/* Sparkline */}
       <div className="lg:w-64 shrink-0">
@@ -1006,5 +1207,7 @@ function ExpandedDetail({
         </table>
       </div>
     </div>
+    <InlineNotesSection teamNumber={team.teamNumber} />
+    </>
   );
 }

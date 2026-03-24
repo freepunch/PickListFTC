@@ -58,6 +58,9 @@ const EVENT_QUERY = `
               dcArtifactPoints
               dcBasePoints
               dcPatternPoints
+              penaltyPointsCommitted
+              majorsCommittedPoints
+              minorsCommittedPoints
             }
             avg {
               totalPointsNp
@@ -68,6 +71,9 @@ const EVENT_QUERY = `
               dcArtifactPoints
               dcBasePoints
               dcPatternPoints
+              penaltyPointsCommitted
+              majorsCommittedPoints
+              minorsCommittedPoints
               movementRp
               goalRp
               patternRp
@@ -171,6 +177,9 @@ const TEAM_REPORT_QUERY = `
               totalPointsNp
               autoPoints
               dcPoints
+              penaltyPointsCommitted
+              majorsCommittedPoints
+              minorsCommittedPoints
               movementRp
               goalRp
               patternRp
@@ -270,6 +279,9 @@ const PRESCOUT_TEAM_QUERY = `
               totalPointsNp
               autoPoints
               dcPoints
+              penaltyPointsCommitted
+              majorsCommittedPoints
+              minorsCommittedPoints
               movementRp
               goalRp
               patternRp

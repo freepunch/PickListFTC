@@ -45,6 +45,10 @@ export interface TeamEventStats2025Group {
   dcArtifactPoints: number;
   dcBasePoints: number;
   dcPatternPoints: number;
+  // Penalty fields (present on opr and avg groups when available)
+  penaltyPointsCommitted?: number;
+  majorsCommittedPoints?: number;
+  minorsCommittedPoints?: number;
   // Only present on avg group
   movementRp?: number;
   goalRp?: number;

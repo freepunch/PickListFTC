@@ -16,12 +16,14 @@ import {
   getTeamClassification,
   rankPartners,
   normalizeStats,
+  penaltyP75,
   PartnerResult,
   PartnerMode,
 } from "@/lib/calculations";
 import { ProcessedTeam, PrescoutRankedTeam } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
+import { PenaltyBadge } from "@/components/PenaltyBadge";
 
 // ── Radar axes (same as compare view) ──
 
@@ -287,12 +289,19 @@ function ExpandedPanel({
   const diffs = useMemo(() => {
     const s = selected.stats;
     const p = partner.stats;
-    return [
+    const rows: { label: string; a: number; b: number; invert?: boolean }[] = [
       { label: "Auto OPR", a: s.opr.autoPoints, b: p.opr.autoPoints },
       { label: "DC OPR", a: s.opr.dcPoints, b: p.opr.dcPoints },
       { label: "Total Avg", a: s.avg.totalPointsNp, b: p.avg.totalPointsNp },
       { label: "Consistency", a: s.dev.totalPointsNp, b: p.dev.totalPointsNp, invert: true },
     ];
+    // Add penalty diff if either team has non-zero penalty data
+    const aPenalty = s.avg.penaltyPointsCommitted ?? 0;
+    const bPenalty = p.avg.penaltyPointsCommitted ?? 0;
+    if (aPenalty > 0 || bPenalty > 0) {
+      rows.push({ label: "Penalties Avg", a: aPenalty, b: bPenalty, invert: true });
+    }
+    return rows;
   }, [selected, partner]);
 
   return (
@@ -406,6 +415,7 @@ function PartnerRow({
   result,
   selected,
   allTeams,
+  penaltyThreshold,
   expanded,
   onToggle,
 }: {
@@ -413,11 +423,13 @@ function PartnerRow({
   result: PartnerResult;
   selected: ProcessedTeam;
   allTeams: ProcessedTeam[];
+  penaltyThreshold: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const router = useRouter();
   const partner = allTeams.find((t) => t.teamNumber === result.teamNumber)!;
+  const partnerPenaltyAvg = partner?.stats.avg.penaltyPointsCommitted ?? 0;
 
   return (
     <div className="border-b border-zinc-800 last:border-b-0" style={{ transition: "transform 0.3s ease, opacity 0.3s ease" }}>
@@ -428,9 +440,10 @@ function PartnerRow({
         }`}
       >
         <span className="font-mono text-sm text-zinc-500 font-medium">#{rank}</span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-1.5">
           <span className="font-mono text-sm text-white font-semibold">{result.teamNumber}</span>
-          <span className="text-sm text-zinc-400 ml-2 truncate">{result.teamName}</span>
+          <span className="text-sm text-zinc-400 truncate">{result.teamName}</span>
+          <PenaltyBadge avg={partnerPenaltyAvg} threshold={penaltyThreshold} />
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden">
@@ -666,6 +679,8 @@ export default function PartnersPage() {
     ? PRESCOUT_MODES.find((m) => m.key === psMode)!
     : MODES.find((m) => m.key === mode)!;
 
+  const penaltyThreshold = useMemo(() => penaltyP75(teams), [teams]);
+
   const handleSelect = useCallback((team: ProcessedTeam) => {
     setSelectedTeam(team);
     setExpandedRow(null);
@@ -767,6 +782,7 @@ export default function PartnersPage() {
                 result={result}
                 selected={selectedTeam}
                 allTeams={teams}
+                penaltyThreshold={penaltyThreshold}
                 expanded={expandedRow === result.teamNumber}
                 onToggle={() => setExpandedRow(expandedRow === result.teamNumber ? null : result.teamNumber)}
               />

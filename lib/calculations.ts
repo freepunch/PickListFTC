@@ -79,6 +79,19 @@ export function normalizeStats(
   return result;
 }
 
+/**
+ * Returns the 75th-percentile avg penalty-points-committed for an event field.
+ * Returns Infinity when no teams have penalty data (suppresses all badges).
+ */
+export function penaltyP75(allTeams: ProcessedTeam[]): number {
+  const vals = allTeams
+    .map((t) => t.stats.avg.penaltyPointsCommitted ?? 0)
+    .sort((a, b) => a - b);
+  if (vals.length === 0) return Infinity;
+  const p75 = vals[Math.floor(vals.length * 0.75)] ?? 0;
+  return p75 > 0 ? p75 : Infinity;
+}
+
 // ── Partner Finder ──
 
 export type PartnerMode = "balanced" | "opr" | "auto" | "dc" | "consistency";
@@ -169,8 +182,18 @@ export function partnerScore(
   const consistencyB = 1 - teamB.dev.totalPointsNp / maxDev;
   const consistency = (consistencyA + consistencyB) / 2;
 
-  const raw = complementarity * 0.4 + strength * 0.4 + consistency * 0.2;
-  return Math.round(Math.min(raw * 100, 100));
+  let score = (complementarity * 0.4 + strength * 0.4 + consistency * 0.2) * 100;
+
+  // Subtle penalty tiebreaker: if teamB is in top-25% for fouls, subtract up to 5 pts
+  const penaltyVals = allTeams.map((t) => t.stats.avg.penaltyPointsCommitted ?? 0);
+  const penaltySorted = [...penaltyVals].sort((a, b) => a - b);
+  const p75 = penaltySorted[Math.floor(penaltySorted.length * 0.75)] ?? 0;
+  const bPenalty = teamB.avg.penaltyPointsCommitted ?? 0;
+  if (p75 > 0 && bPenalty > p75) {
+    score -= Math.min((bPenalty - p75) / (p75 || 1), 1) * 5;
+  }
+
+  return Math.round(Math.min(score, 100));
 }
 
 function getComplementarityTag(

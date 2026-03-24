@@ -17,6 +17,9 @@ import { getTeamReport } from "@/lib/api";
 import { getWLT } from "@/lib/calculations";
 import { TeamReport, TeamEventEntry, TeamEventStats2025 } from "@/lib/types";
 import { useEvent } from "@/context/EventContext";
+import { useNotes } from "@/context/NotesContext";
+import { NoteForm } from "@/components/NoteForm";
+import { tagColorClass } from "@/lib/notes";
 
 // ── Executive summary builder ──
 
@@ -152,6 +155,14 @@ function rpBg(val: number): string {
   return "bg-red-500/15";
 }
 
+// ── Penalty helpers ──
+
+function penaltyRisk(avg: number): { label: string; color: string; bg: string } {
+  if (avg < 5) return { label: "Low risk", color: "text-green-400", bg: "bg-green-500/10" };
+  if (avg <= 15) return { label: "Moderate risk", color: "text-yellow-400", bg: "bg-yellow-500/10" };
+  return { label: "High risk — frequent penalties", color: "text-red-400", bg: "bg-red-500/10" };
+}
+
 // ── Main Page ──
 
 export default function TeamReportPage({
@@ -164,7 +175,9 @@ export default function TeamReportPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { loadEvent } = useEvent();
+  const { loadEvent, teams: eventTeams } = useEvent();
+  const { notesForTeam, deleteNote } = useNotes();
+  const [noteFormOpen, setNoteFormOpen] = useState(false);
 
   useEffect(() => {
     if (isNaN(teamNumber)) {
@@ -233,6 +246,25 @@ export default function TeamReportPage({
         allStats.reduce((s, st) => s + (st.avg.patternRp ?? 0), 0) / n,
     };
   }, [allStats]);
+
+  // Penalty profile data
+  const penaltyProfile = useMemo(() => {
+    if (allStats.length === 0) return null;
+    const hasPenaltyData = allStats.some((s) => s.avg.penaltyPointsCommitted !== undefined);
+    if (!hasPenaltyData) return null;
+    const n = allStats.length;
+    const avg = allStats.reduce((s, st) => s + (st.avg.penaltyPointsCommitted ?? 0), 0) / n;
+    const majors = allStats.reduce((s, st) => s + (st.avg.majorsCommittedPoints ?? 0), 0) / n;
+    const minors = allStats.reduce((s, st) => s + (st.avg.minorsCommittedPoints ?? 0), 0) / n;
+    return { avg, majors, minors };
+  }, [allStats]);
+
+  const eventAvgPenalty = useMemo(() => {
+    if (eventTeams.length === 0) return null;
+    const vals = eventTeams.map((t) => t.stats.avg.penaltyPointsCommitted ?? 0);
+    if (vals.every((v) => v === 0)) return null;
+    return vals.reduce((s, v) => s + v, 0) / vals.length;
+  }, [eventTeams]);
 
   const handleEventClick = (entry: TeamEventEntry) => {
     loadEvent(entry.eventCode);
@@ -324,6 +356,70 @@ export default function TeamReportPage({
           </p>
         </div>
       </div>
+
+      {/* Scout Notes */}
+      {(() => {
+        const teamNotes = notesForTeam(teamNumber);
+        return (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-200">Scout Notes</h3>
+              {!noteFormOpen && (
+                <button
+                  onClick={() => setNoteFormOpen(true)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-[var(--accent)] transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Add Note
+                </button>
+              )}
+            </div>
+            {noteFormOpen && (
+              <div className="mb-4">
+                <NoteForm teamNumber={teamNumber} onClose={() => setNoteFormOpen(false)} />
+              </div>
+            )}
+            {teamNotes.length === 0 && !noteFormOpen ? (
+              <p className="text-xs text-zinc-600">No notes yet. Click &ldquo;Add Note&rdquo; to record observations.</p>
+            ) : (
+              <div className="space-y-2">
+                {teamNotes.map((note) => (
+                  <div key={note.id} className="bg-zinc-800/50 rounded-lg px-3 py-2.5 group/note">
+                    {note.text && (
+                      <p className="text-xs text-zinc-300 mb-2 leading-relaxed">{note.text}</p>
+                    )}
+                    {note.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {note.tags.map((tag) => (
+                          <span key={tag} className={`text-[10px] px-1.5 py-0.5 rounded-full ${tagColorClass(tag)}`}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-zinc-600">
+                        {new Date(note.timestamp).toLocaleString(undefined, {
+                          month: "short", day: "numeric",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </p>
+                      <button
+                        onClick={() => deleteNote(note.id)}
+                        className="text-[10px] text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover/note:opacity-100"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Season OPR trend chart */}
       {trendData.length > 0 && (
@@ -514,6 +610,53 @@ export default function TeamReportPage({
         )}
       </div>
 
+      {/* Penalty Profile card */}
+      {penaltyProfile && (() => {
+        const risk = penaltyRisk(penaltyProfile.avg);
+        const diff = eventAvgPenalty !== null ? penaltyProfile.avg - eventAvgPenalty : null;
+        return (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-zinc-200 mb-4">Penalty Profile</h3>
+            <div className="flex flex-wrap items-start gap-6">
+              {/* Main avg */}
+              <div className="text-center min-w-[80px]">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Avg / Match</p>
+                <p className="text-2xl font-mono font-semibold text-white">
+                  {penaltyProfile.avg.toFixed(1)}
+                </p>
+                <p className="text-xs text-zinc-600 mt-0.5">pts committed</p>
+              </div>
+              {/* Breakdown */}
+              <div className="text-center min-w-[70px]">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Majors</p>
+                <p className="text-2xl font-mono font-semibold text-zinc-300">
+                  {penaltyProfile.majors.toFixed(1)}
+                </p>
+              </div>
+              <div className="text-center min-w-[70px]">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Minors</p>
+                <p className="text-2xl font-mono font-semibold text-zinc-300">
+                  {penaltyProfile.minors.toFixed(1)}
+                </p>
+              </div>
+              {/* vs event average */}
+              {diff !== null && (
+                <div className="text-center min-w-[80px]">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">vs Event Avg</p>
+                  <p className={`text-2xl font-mono font-semibold ${diff > 0 ? "text-red-400" : "text-green-400"}`}>
+                    {diff > 0 ? "+" : ""}{diff.toFixed(1)}
+                  </p>
+                </div>
+              )}
+              {/* Risk badge */}
+              <div className={`ml-auto self-center px-3 py-2 rounded-lg ${risk.bg}`}>
+                <p className={`text-sm font-medium ${risk.color}`}>{risk.label}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Event-by-event table */}
       {eventsWithStats.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -532,6 +675,7 @@ export default function TeamReportPage({
                   <th className="text-left px-3 py-2.5">W-L-T</th>
                   <th className="text-right px-3 py-2.5">OPR</th>
                   <th className="text-right px-3 py-2.5">Avg Score</th>
+                  <th className="text-right px-3 py-2.5">Penalties</th>
                   <th className="text-right px-6 py-2.5">Matches</th>
                 </tr>
               </thead>
@@ -564,6 +708,11 @@ export default function TeamReportPage({
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono text-zinc-400">
                         {s.avg.totalPointsNp.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-zinc-500">
+                        {s.avg.penaltyPointsCommitted !== undefined
+                          ? s.avg.penaltyPointsCommitted.toFixed(1)
+                          : "—"}
                       </td>
                       <td className="px-6 py-2.5 text-right font-mono text-zinc-500">
                         {s.qualMatchesPlayed}

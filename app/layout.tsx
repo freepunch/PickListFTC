@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { EventProvider } from "@/context/EventContext";
+import { NotesProvider } from "@/context/NotesContext";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://picklistftc.com"),
@@ -39,7 +40,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <EventProvider>{children}</EventProvider>
+        <EventProvider>
+          <NotesProvider>{children}</NotesProvider>
+        </EventProvider>
       </body>
     </html>
   );
