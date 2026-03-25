@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -685,6 +685,26 @@ export default function PartnersPage() {
     setSelectedTeam(team);
     setExpandedRow(null);
   }, []);
+
+  // Restore ?team= from URL once teams are loaded
+  const hasRestoredTeamRef = useRef(false);
+  useEffect(() => {
+    if (hasRestoredTeamRef.current || teams.length === 0) return;
+    hasRestoredTeamRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const teamNum = params.get("team");
+    if (!teamNum) return;
+    const team = teams.find((t) => t.teamNumber === Number(teamNum));
+    if (team) setSelectedTeam(team);
+  }, [teams]);
+
+  // Sync selectedTeam into URL so ShareButton can read it
+  useEffect(() => {
+    if (!selectedTeam) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("team", String(selectedTeam.teamNumber));
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }, [selectedTeam]);
 
   if (!event) {
     return (

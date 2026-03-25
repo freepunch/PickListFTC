@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, FormEvent, useMemo } from "re
 import { useEvent } from "@/context/EventContext";
 import { searchEvents } from "@/lib/api";
 import { EventSearchResult } from "@/lib/types";
+import { ShareButton } from "@/components/SharePopover";
 
 // Expose the input ref for global keyboard shortcut
 let globalFocusInput: (() => void) | null = null;
@@ -69,6 +70,17 @@ export function EventLoader() {
   useEffect(() => {
     globalFocusInput = () => inputRef.current?.focus();
     return () => { globalFocusInput = null; };
+  }, []);
+
+  // Auto-load event from ?event= URL param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("event");
+    if (code && !event) {
+      setEventCode(code.toUpperCase());
+      loadEvent(code.toUpperCase());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load recent events on mount & after loading
@@ -347,6 +359,8 @@ export function EventLoader() {
             "Load Event"
           )}
         </button>
+
+        <ShareButton />
 
         {error && (
           <div className="flex items-center gap-2 text-sm text-[var(--danger)] self-center ml-2">

@@ -551,6 +551,20 @@ export default function ComparePage() {
   // Local slot state: initialized from context selectedTeams
   const [slots, setSlots] = useState<(number | null)[]>([null, null]);
 
+  // Restore ?teams= from URL once teams are loaded
+  const hasRestoredTeamsRef = useRef(false);
+  useEffect(() => {
+    if (hasRestoredTeamsRef.current || teams.length === 0) return;
+    hasRestoredTeamsRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const teamsParam = params.get("teams");
+    if (!teamsParam) return;
+    const nums = teamsParam.split(",").map(Number).filter(Boolean);
+    nums.forEach((n) => {
+      if (teams.some((t) => t.teamNumber === n)) toggleTeamSelection(n);
+    });
+  }, [teams, toggleTeamSelection]);
+
   // Escape key clears selections
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
