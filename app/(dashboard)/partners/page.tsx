@@ -91,7 +91,7 @@ function TeamSelector({
   }, [query, teams]);
 
   return (
-    <div className="relative w-72">
+    <div className="relative w-full sm:w-72">
       <input
         type="text"
         value={query}
@@ -135,9 +135,9 @@ function TeamSelector({
 function SelectedTeamCard({ team, isPrescout, prescoutTeam }: { team: ProcessedTeam; isPrescout?: boolean; prescoutTeam?: PrescoutRankedTeam | null }) {
   const classification = getTeamClassification(team.stats);
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex items-center gap-6">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <span className="font-mono text-2xl font-bold text-white">{team.teamNumber}</span>
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded-full border ${classificationColor(classification)}`}
@@ -152,7 +152,7 @@ function SelectedTeamCard({ team, isPrescout, prescoutTeam }: { team: ProcessedT
         </div>
         <p className="text-sm text-zinc-400 truncate">{team.teamName}</p>
       </div>
-      <div className="flex gap-6 text-center shrink-0">
+      <div className="flex gap-4 sm:gap-6 text-center shrink-0">
         {isPrescout && prescoutTeam ? (
           <>
             <div>
@@ -305,7 +305,7 @@ function ExpandedPanel({
   }, [selected, partner]);
 
   return (
-    <div className="grid grid-cols-[1fr_1fr] gap-4 p-4 bg-zinc-950 border-t border-zinc-800">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-zinc-950 border-t border-zinc-800">
       <div>
         <div className="flex items-center gap-4 mb-2">
           <div className="flex items-center gap-1.5">
@@ -433,9 +433,10 @@ function PartnerRow({
 
   return (
     <div className="border-b border-zinc-800 last:border-b-0" style={{ transition: "transform 0.3s ease, opacity 0.3s ease" }}>
+      {/* Desktop layout (sm+) */}
       <div
         onClick={onToggle}
-        className={`grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-3 cursor-pointer transition-colors ${
+        className={`hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-3 cursor-pointer transition-colors ${
           expanded ? "bg-zinc-900" : "hover:bg-zinc-900/50"
         }`}
       >
@@ -456,26 +457,51 @@ function PartnerRow({
           {result.complementarityTag}
         </span>
         <div className="flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)}
-            title="Compare"
-            className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-            </svg>
+          <button onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)} title="Compare" className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
           </button>
-          <button
-            onClick={() => router.push(`/report/${result.teamNumber}`)}
-            title="Report"
-            className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
+          <button onClick={() => router.push(`/report/${result.teamNumber}`)} title="Report" className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
           </button>
         </div>
       </div>
+
+      {/* Mobile layout (<sm) */}
+      <div
+        onClick={onToggle}
+        className={`sm:hidden px-4 py-3 cursor-pointer transition-colors ${expanded ? "bg-zinc-900" : "hover:bg-zinc-900/50"}`}
+      >
+        {/* Line 1: rank + team number + name + penalty */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-mono text-xs text-zinc-500 shrink-0">#{rank}</span>
+          <span className="font-mono text-sm text-white font-semibold">{result.teamNumber}</span>
+          <span className="text-sm text-zinc-400 truncate flex-1">{result.teamName}</span>
+          <PenaltyBadge avg={partnerPenaltyAvg} threshold={penaltyThreshold} />
+        </div>
+        {/* Line 2: score bar + combined OPR */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${scoreBarColor(result.score)}`} style={{ width: `${result.score}%` }} />
+          </div>
+          <span className="font-mono text-xs font-semibold text-white w-6 text-right shrink-0">{result.score}</span>
+          <span className="text-xs text-zinc-500 shrink-0">· OPR {result.projectedCombinedOpr.toFixed(1)}</span>
+        </div>
+        {/* Line 3: tag + action buttons */}
+        <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${tagColor(result.complementarityTag)}`}>
+            {result.complementarityTag}
+          </span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)} title="Compare" className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+            </button>
+            <button onClick={() => router.push(`/report/${result.teamNumber}`)} title="Report" className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {expanded && (
         <ExpandedPanel selected={selected} partner={partner} allTeams={allTeams} />
       )}
@@ -725,10 +751,10 @@ export default function PartnersPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <PrescoutBanner />
-      <div className="p-6 max-w-6xl mx-auto space-y-6 flex-1">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6 flex-1">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Partner Finder</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Partner Finder</h1>
           <p className="text-sm text-zinc-500 mt-1">
             {isPrescout
               ? `Select your team to see ranked alliance partners based on season performance`
@@ -738,8 +764,8 @@ export default function PartnersPage() {
         </div>
 
         {/* Team selector */}
-        <div className="flex items-end gap-4">
-          <div>
+        <div className="flex items-end gap-3">
+          <div className="flex-1 sm:flex-initial">
             <label className="block text-xs font-medium text-zinc-500 mb-1.5">Your Team</label>
             <TeamSelector teams={teams} onSelect={handleSelect} />
           </div>
@@ -749,7 +775,7 @@ export default function PartnersPage() {
                 setSelectedTeam(null);
                 setExpandedRow(null);
               }}
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors pb-2"
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors pb-2 min-h-[44px]"
             >
               Clear
             </button>
@@ -763,7 +789,7 @@ export default function PartnersPage() {
 
         {/* Mode selector */}
         {selectedTeam && (
-          <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg w-fit">
+          <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg overflow-x-auto w-full sm:w-fit" style={{ scrollbarWidth: "none" }}>
             {(isPrescout ? PRESCOUT_MODES : MODES).map((m) => (
               <button
                 key={m.key}

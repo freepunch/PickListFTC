@@ -896,7 +896,7 @@ export default function LeaderboardPage() {
                                     : "bg-zinc-900/60"
                               } hover:bg-zinc-800/70`}
                             >
-                              <td className="px-3 py-2.5 sticky left-0 bg-inherit z-10">
+                              <td className="px-3 py-2.5 sticky left-0 bg-zinc-900 z-10">
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={(e) => {
@@ -945,7 +945,7 @@ export default function LeaderboardPage() {
                                         : "text-left"
                                     } ${
                                       isSticky
-                                        ? "sticky left-10 bg-inherit z-10 font-mono text-white font-medium"
+                                        ? "sticky left-10 bg-zinc-900 z-10 font-mono text-white font-medium"
                                         : ""
                                     } ${
                                       isSorted ? "bg-[var(--accent)]/5" : ""

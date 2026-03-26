@@ -206,9 +206,9 @@ export function EventLoader() {
   const showSearchDropdown = mode === "search" && showDropdown && (searching || searchResults.length > 0);
 
   return (
-    <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4">
-      <form onSubmit={handleSubmit} className="flex items-end gap-3">
-        <div className="relative" ref={containerRef}>
+    <div className="bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-4">
+      <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2 sm:gap-3">
+        <div className="relative flex-1 min-w-0" ref={containerRef}>
           <label className="block text-xs font-medium text-zinc-500 mb-1.5">
             Event Code or Name
           </label>
@@ -223,7 +223,7 @@ export function EventLoader() {
               placeholder="e.g. USTXCMP or Texas"
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
                 placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
-                focus:ring-1 focus:ring-[var(--accent)]/30 w-64 font-mono transition-colors"
+                focus:ring-1 focus:ring-[var(--accent)]/30 w-full sm:w-64 font-mono transition-colors"
             />
             {searching && (
               <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -251,7 +251,7 @@ export function EventLoader() {
 
           {/* Recent events dropdown */}
           {showRecentDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-80 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1 w-full sm:w-80 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
               <p className="px-3 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-700">
                 Recent Events
               </p>
@@ -284,7 +284,7 @@ export function EventLoader() {
 
           {/* Search results dropdown */}
           {showSearchDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-96 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 w-full sm:w-96 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto">
               {searching && searchResults.length === 0 ? (
                 <div className="px-3 py-6 text-center">
                   <svg className="w-5 h-5 animate-spin text-zinc-500 mx-auto mb-2" viewBox="0 0 24 24" fill="none">
@@ -343,9 +343,9 @@ export function EventLoader() {
         <button
           type="submit"
           disabled={loading || !eventCode.trim()}
-          className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40
+          className="px-5 py-2 min-h-[42px] shrink-0 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40
             disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all
-            duration-150 active:scale-[0.97]"
+            duration-150 active:scale-[0.97] self-end"
         >
           {loading ? (
             <span className="flex items-center gap-2">

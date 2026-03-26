@@ -541,135 +541,168 @@ export default function SchedulePage() {
                 No matches to display
               </div>
             ) : (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[580px]">
-                    <thead>
-                      <tr className="border-b border-zinc-800 text-xs text-zinc-500 uppercase tracking-wider">
-                        <th className="text-left px-4 py-3 w-20">Match</th>
-                        {/* Red alliance cells */}
-                        <th className="text-center px-3 py-3 bg-red-500/5">Red 1</th>
-                        <th className="text-center px-3 py-3 bg-red-500/5">Red 2</th>
-                        {/* Blue alliance cells */}
-                        <th className="text-center px-3 py-3 bg-blue-500/5">Blue 1</th>
-                        <th className="text-center px-3 py-3 bg-blue-500/5">Blue 2</th>
-                        {/* Score / prediction */}
-                        <th className="text-right px-4 py-3">Score / Prediction</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visible.map((m) => {
-                        const isNow = m.id === nowId;
-                        const isExpanded = expandedMatch === m.id;
-                        const highlighted = !!(highlightTeam && (
-                          m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
-                        ));
+              <>
+                {/* ── Desktop table (sm+) ── */}
+                <div className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[580px]">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-xs text-zinc-500 uppercase tracking-wider">
+                          <th className="text-left px-4 py-3 w-20">Match</th>
+                          <th className="text-center px-3 py-3 bg-red-500/5">Red 1</th>
+                          <th className="text-center px-3 py-3 bg-red-500/5">Red 2</th>
+                          <th className="text-center px-3 py-3 bg-blue-500/5">Blue 1</th>
+                          <th className="text-center px-3 py-3 bg-blue-500/5">Blue 2</th>
+                          <th className="text-right px-4 py-3">Score / Prediction</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((m) => {
+                          const isNow = m.id === nowId;
+                          const isExpanded = expandedMatch === m.id;
+                          const highlighted = !!(highlightTeam && (
+                            m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
+                          ));
+                          const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
+                          const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
+                          const rowBg = isNow
+                            ? "bg-amber-500/5 border-l-2 border-l-amber-500/50"
+                            : highlighted ? "bg-[var(--accent)]/5" : "";
 
-                        // Score result for completed matches
-                        const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
-                        const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
-
-                        const rowBg = isNow
-                          ? "bg-amber-500/5 border-l-2 border-l-amber-500/50"
-                          : highlighted
-                            ? "bg-[var(--accent)]/5"
-                            : "";
-
-                        return (
-                          <Fragment key={m.id}>
-                            <tr
-                              onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
-                              className={`border-b border-zinc-800/50 last:border-0 cursor-pointer
-                                hover:bg-zinc-800/50 transition-colors ${rowBg}`}
-                            >
-                              {/* Match # + status */}
-                              <td className="px-4 py-3">
-                                <div className="flex flex-col gap-1">
-                                  <span className="font-mono text-sm font-semibold text-zinc-200 tabular-nums">
-                                    Q{m.id}
-                                  </span>
-                                  <StatusPill played={m.played} isNow={isNow} />
-                                </div>
-                              </td>
-
-                              {/* Red 1 */}
-                              <td className="px-3 py-3 text-center bg-red-500/5">
-                                <TeamLink num={m.red[0]} />
-                              </td>
-                              {/* Red 2 */}
-                              <td className="px-3 py-3 text-center bg-red-500/5">
-                                <TeamLink num={m.red[1]} />
-                              </td>
-
-                              {/* Blue 1 */}
-                              <td className="px-3 py-3 text-center bg-blue-500/5">
-                                <TeamLink num={m.blue[0]} />
-                              </td>
-                              {/* Blue 2 */}
-                              <td className="px-3 py-3 text-center bg-blue-500/5">
-                                <TeamLink num={m.blue[1]} />
-                              </td>
-
-                              {/* Score / prediction */}
-                              <td className="px-4 py-3 text-right">
-                                {m.played ? (
-                                  /* Completed: show actual scores */
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className={`font-mono text-sm font-bold tabular-nums ${redWon ? "text-red-300" : "text-zinc-400"}`}>
-                                      {m.redScore?.toFixed(0) ?? "—"}
-                                    </span>
-                                    <span className="text-zinc-700 text-xs">–</span>
-                                    <span className={`font-mono text-sm font-bold tabular-nums ${blueWon ? "text-blue-300" : "text-zinc-400"}`}>
-                                      {m.blueScore?.toFixed(0) ?? "—"}
-                                    </span>
+                          return (
+                            <Fragment key={m.id}>
+                              <tr
+                                onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
+                                className={`border-b border-zinc-800/50 last:border-0 cursor-pointer hover:bg-zinc-800/50 transition-colors ${rowBg}`}
+                              >
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="font-mono text-sm font-semibold text-zinc-200 tabular-nums">Q{m.id}</span>
+                                    <StatusPill played={m.played} isNow={isNow} />
                                   </div>
-                                ) : (
-                                  /* Upcoming: predicted scores + tug-of-war bar */
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <span className="font-mono text-xs text-red-400/60 italic tabular-nums">
-                                        ~{m.redPred}
-                                      </span>
-                                      <span className="text-zinc-700 text-[10px]">–</span>
-                                      <span className="font-mono text-xs text-blue-400/60 italic tabular-nums">
-                                        ~{m.bluePred}
-                                      </span>
-                                    </div>
-                                    {/* Tug-of-war bar */}
-                                    <div className="h-1.5 rounded-full overflow-hidden flex w-24 ml-auto">
-                                      <div
-                                        className="bg-red-500/50 transition-all"
-                                        style={{ width: `${m.redWinProb * 100}%` }}
-                                      />
-                                      <div
-                                        className="bg-blue-500/50 transition-all"
-                                        style={{ width: `${(1 - m.redWinProb) * 100}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-
-                            {/* Expanded detail row */}
-                            {isExpanded && (
-                              <tr className="bg-zinc-800/20 border-b border-zinc-800/50">
-                                <td colSpan={6} className="px-5 py-4">
+                                </td>
+                                <td className="px-3 py-3 text-center bg-red-500/5"><TeamLink num={m.red[0]} /></td>
+                                <td className="px-3 py-3 text-center bg-red-500/5"><TeamLink num={m.red[1]} /></td>
+                                <td className="px-3 py-3 text-center bg-blue-500/5"><TeamLink num={m.blue[0]} /></td>
+                                <td className="px-3 py-3 text-center bg-blue-500/5"><TeamLink num={m.blue[1]} /></td>
+                                <td className="px-4 py-3 text-right">
                                   {m.played ? (
-                                    <CompletedDetail m={m} />
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className={`font-mono text-sm font-bold tabular-nums ${redWon ? "text-red-300" : "text-zinc-400"}`}>{m.redScore?.toFixed(0) ?? "—"}</span>
+                                      <span className="text-zinc-700 text-xs">–</span>
+                                      <span className={`font-mono text-sm font-bold tabular-nums ${blueWon ? "text-blue-300" : "text-zinc-400"}`}>{m.blueScore?.toFixed(0) ?? "—"}</span>
+                                    </div>
                                   ) : (
-                                    <UpcomingDetail m={m} oprMap={oprMap} devMap={devMap} />
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="font-mono text-xs text-red-400/60 italic tabular-nums">~{m.redPred}</span>
+                                        <span className="text-zinc-700 text-[10px]">–</span>
+                                        <span className="font-mono text-xs text-blue-400/60 italic tabular-nums">~{m.bluePred}</span>
+                                      </div>
+                                      <div className="h-1.5 rounded-full overflow-hidden flex w-24 ml-auto">
+                                        <div className="bg-red-500/50 transition-all" style={{ width: `${m.redWinProb * 100}%` }} />
+                                        <div className="bg-blue-500/50 transition-all" style={{ width: `${(1 - m.redWinProb) * 100}%` }} />
+                                      </div>
+                                    </div>
                                   )}
                                 </td>
                               </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              {isExpanded && (
+                                <tr className="bg-zinc-800/20 border-b border-zinc-800/50">
+                                  <td colSpan={6} className="px-5 py-4">
+                                    {m.played ? <CompletedDetail m={m} /> : <UpcomingDetail m={m} oprMap={oprMap} devMap={devMap} />}
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+
+                {/* ── Mobile card list (<sm) ── */}
+                <div className="sm:hidden space-y-2">
+                  {visible.map((m) => {
+                    const isNow = m.id === nowId;
+                    const isExpanded = expandedMatch === m.id;
+                    const highlighted = !!(highlightTeam && (
+                      m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
+                    ));
+                    const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
+                    const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
+
+                    return (
+                      <Fragment key={m.id}>
+                        <div
+                          onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
+                          className={`bg-zinc-900 border rounded-xl px-4 py-3 cursor-pointer transition-colors ${
+                            isNow
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : highlighted
+                                ? "border-[var(--accent)]/30 bg-[var(--accent)]/5"
+                                : "border-zinc-800 hover:bg-zinc-800/50"
+                          }`}
+                        >
+                          {/* Header row */}
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm font-bold text-zinc-200 tabular-nums">Q{m.id}</span>
+                              <StatusPill played={m.played} isNow={isNow} />
+                            </div>
+                            {/* Score / prediction */}
+                            {m.played ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-mono text-sm font-bold tabular-nums ${redWon ? "text-red-300" : "text-zinc-400"}`}>{m.redScore?.toFixed(0) ?? "—"}</span>
+                                <span className="text-zinc-600 text-xs">–</span>
+                                <span className={`font-mono text-sm font-bold tabular-nums ${blueWon ? "text-blue-300" : "text-zinc-400"}`}>{m.blueScore?.toFixed(0) ?? "—"}</span>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-xs text-zinc-500 italic">~{m.redPred} – ~{m.bluePred}</span>
+                            )}
+                          </div>
+
+                          {/* Alliances */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 bg-red-500/5 rounded-lg px-2.5 py-1.5">
+                              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                              <span className="text-xs text-zinc-500 w-7 shrink-0">Red</span>
+                              <div className="flex gap-3">
+                                <TeamLink num={m.red[0]} />
+                                <TeamLink num={m.red[1]} />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 bg-blue-500/5 rounded-lg px-2.5 py-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                              <span className="text-xs text-zinc-500 w-7 shrink-0">Blue</span>
+                              <div className="flex gap-3">
+                                <TeamLink num={m.blue[0]} />
+                                <TeamLink num={m.blue[1]} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Prediction bar for upcoming */}
+                          {!m.played && (
+                            <div className="mt-2.5 h-1.5 rounded-full overflow-hidden flex">
+                              <div className="bg-red-500/50" style={{ width: `${m.redWinProb * 100}%` }} />
+                              <div className="bg-blue-500/50" style={{ width: `${(1 - m.redWinProb) * 100}%` }} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Expanded detail */}
+                        {isExpanded && (
+                          <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-4">
+                            {m.played ? <CompletedDetail m={m} /> : <UpcomingDetail m={m} oprMap={oprMap} devMap={devMap} />}
+                          </div>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </>
         )}

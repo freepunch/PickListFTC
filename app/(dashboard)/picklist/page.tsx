@@ -71,6 +71,7 @@ export default function PickListPage() {
   const [dragSource, setDragSource] = useState<DragSource | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [availableSearch, setAvailableSearch] = useState("");
+  const [mobileTab, setMobileTab] = useState<"available" | "picklist">("available");
 
   // Track which event code we've initialized for
   const loadedCodeRef = useRef<string | null>(null);
@@ -553,10 +554,27 @@ export default function PickListPage() {
         </span>
       </div>
 
+      {/* Mobile tab bar */}
+      <div className="sm:hidden flex border-b border-[var(--border)] shrink-0">
+        {(["available", "picklist"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setMobileTab(tab)}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              mobileTab === tab
+                ? "text-white border-b-2 border-[var(--accent)]"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab === "available" ? `Available (${availableTeams.length})` : `My List (${entries.length})`}
+          </button>
+        ))}
+      </div>
+
       {/* Two-column layout */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Available Teams */}
-        <div className="w-72 shrink-0 border-r border-[var(--border)] flex flex-col min-h-0">
+        <div className={`sm:w-72 sm:shrink-0 sm:border-r sm:border-[var(--border)] flex flex-col min-h-0 ${mobileTab === "available" ? "flex w-full" : "hidden sm:flex"}`}>
           <div className="px-4 py-2.5 border-b border-[var(--border)] shrink-0">
             <p className="text-sm font-medium text-zinc-300">Available Teams</p>
             <p className="text-xs text-zinc-600 mt-0.5">
@@ -608,21 +626,39 @@ export default function PickListPage() {
                   draggable
                   onDragStart={(e) => handleAvailableDragStart(e, team)}
                   onDragEnd={handleDragEnd}
-                  onClick={() => addEntry(team)}
-                  className="flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 cursor-pointer select-none group border-b border-zinc-800/50 last:border-b-0"
+                  className="flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 select-none group border-b border-zinc-800/50 last:border-b-0"
                 >
-                  <span className="text-zinc-700 group-hover:text-zinc-500 shrink-0 cursor-grab">
+                  <span
+                    className="text-zinc-700 group-hover:text-zinc-500 shrink-0 cursor-grab hidden sm:block"
+                    onClick={() => addEntry(team)}
+                  >
                     <GripIcon />
                   </span>
-                  <span className="font-mono text-sm font-semibold text-white w-12 shrink-0">
+                  <span
+                    className="font-mono text-sm font-semibold text-white w-12 shrink-0 cursor-pointer"
+                    onClick={() => { addEntry(team); setMobileTab("picklist"); }}
+                  >
                     {team.teamNumber}
                   </span>
-                  <span className="text-xs text-zinc-400 flex-1 truncate">
+                  <span
+                    className="text-xs text-zinc-400 flex-1 truncate cursor-pointer"
+                    onClick={() => { addEntry(team); setMobileTab("picklist"); }}
+                  >
                     {team.teamName}
                   </span>
-                  <span className="font-mono text-xs text-zinc-600 shrink-0 tabular-nums">
+                  <span className="font-mono text-xs text-zinc-600 shrink-0 tabular-nums hidden sm:block">
                     {team.opr.toFixed(1)}
                   </span>
+                  {/* Mobile add button */}
+                  <button
+                    className="sm:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 rounded-md transition-colors"
+                    onClick={() => { addEntry(team); setMobileTab("picklist"); }}
+                    title="Add to pick list"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
                 </div>
               ))
             )}
@@ -630,7 +666,7 @@ export default function PickListPage() {
         </div>
 
         {/* Right: My Pick List */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        <div className={`flex-1 flex flex-col min-h-0 min-w-0 ${mobileTab === "picklist" ? "flex" : "hidden sm:flex"}`}>
           <div className="px-4 py-2.5 border-b border-[var(--border)] shrink-0">
             <p className="text-sm font-medium text-zinc-300">My Pick List</p>
             <p className="text-xs text-zinc-600 mt-0.5">

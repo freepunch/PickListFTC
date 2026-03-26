@@ -302,12 +302,12 @@ export default function TeamReportPage({
   }
 
   return (
-    <div className="min-h-screen p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-4xl font-bold font-mono text-white">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <h1 className="text-3xl sm:text-4xl font-bold font-mono text-white">
               {report.number}
             </h1>
             <span
@@ -322,7 +322,7 @@ export default function TeamReportPage({
               {strengthProfile.label}
             </span>
           </div>
-          <p className="text-lg text-zinc-300">{report.name}</p>
+          <p className="text-base sm:text-lg text-zinc-300">{report.name}</p>
           <p className="text-sm text-zinc-500">
             {report.schoolName}
             {report.rookieYear > 0 && (
@@ -332,7 +332,7 @@ export default function TeamReportPage({
             )}
           </p>
         </div>
-        <div className="text-right shrink-0">
+        <div className="sm:text-right shrink-0">
           <span className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-zinc-300">
             <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
@@ -427,7 +427,7 @@ export default function TeamReportPage({
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">
             Season OPR Trend
           </h3>
-          <div className="h-72">
+          <div className="h-52 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={trendData}
@@ -495,7 +495,7 @@ export default function TeamReportPage({
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">
               Season Best (QuickStats)
             </h3>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {(
                 [
                   { key: "tot" as const, label: "Total" },
@@ -666,17 +666,17 @@ export default function TeamReportPage({
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
-                  <th className="text-left px-6 py-2.5">Event</th>
+                  <th className="text-left px-4 py-2.5 sticky left-0 bg-zinc-900">Event</th>
                   <th className="text-left px-3 py-2.5">Date</th>
                   <th className="text-right px-3 py-2.5">Rank</th>
                   <th className="text-left px-3 py-2.5">W-L-T</th>
                   <th className="text-right px-3 py-2.5">OPR</th>
                   <th className="text-right px-3 py-2.5">Avg Score</th>
                   <th className="text-right px-3 py-2.5">Penalties</th>
-                  <th className="text-right px-6 py-2.5">Matches</th>
+                  <th className="text-right px-4 py-2.5">Matches</th>
                 </tr>
               </thead>
               <tbody>
@@ -688,7 +688,7 @@ export default function TeamReportPage({
                       onClick={() => handleEventClick(entry)}
                       className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 cursor-pointer transition-colors"
                     >
-                      <td className="px-6 py-2.5 text-zinc-200 max-w-[200px] truncate">
+                      <td className="px-4 py-2.5 text-zinc-200 max-w-[160px] truncate sticky left-0 bg-zinc-900">
                         {entry.event.name}
                       </td>
                       <td className="px-3 py-2.5 text-zinc-500 text-xs font-mono">

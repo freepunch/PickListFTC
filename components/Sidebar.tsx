@@ -80,28 +80,22 @@ function formatTimeAgo(ts: number): string {
   return `${hours}h ago`;
 }
 
-export function Sidebar() {
+// ── Shared sidebar content ──
+
+function SidebarContent({
+  collapsed,
+  onNavClick,
+}: {
+  collapsed: boolean;
+  onNavClick?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { event, teams, lastUpdated, loading, refreshEvent, highContrast, setHighContrast } = useEvent();
-  const [collapsed, setCollapsed] = useState(false);
   const [showReportSearch, setShowReportSearch] = useState(false);
   const [reportQuery, setReportQuery] = useState("");
   const [, setTick] = useState(0);
 
-  // Auto-collapse below 1024px
-  useEffect(() => {
-    function handleResize() {
-      if (window.innerWidth < 1024) {
-        setCollapsed(true);
-      }
-    }
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Tick every 30s to update "last updated" display
   useEffect(() => {
     if (!lastUpdated) return;
     const interval = setInterval(() => setTick((t) => t + 1), 30000);
@@ -114,41 +108,14 @@ export function Sidebar() {
       router.push(`/report/${num}`);
       setShowReportSearch(false);
       setReportQuery("");
+      onNavClick?.();
     }
   };
 
   return (
-    <aside
-      className={`sticky top-0 h-screen flex flex-col bg-zinc-900 border-r border-[var(--border)] transition-[width] duration-200 shrink-0 ${
-        collapsed ? "w-16" : "w-60"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-        {!collapsed && (
-          <h1 className="text-lg font-bold text-white tracking-tight">
-            PickList<span className="text-[var(--accent)]">FTC</span>
-          </h1>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-      </div>
-
+    <>
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-0.5">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isReport = item.href === "/report";
           const isActive = isReport
@@ -164,13 +131,13 @@ export function Sidebar() {
                   onClick={() => {
                     if (collapsed) {
                       const num = prompt("Enter team number:");
-                      if (num) router.push(`/report/${num}`);
+                      if (num) { router.push(`/report/${num}`); onNavClick?.(); }
                     } else {
                       setShowReportSearch(!showReportSearch);
                     }
                   }}
                   title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 min-h-[44px] ${
                     isActive
                       ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                       : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
@@ -182,10 +149,7 @@ export function Sidebar() {
                 {showReportSearch && !collapsed && (
                   <div className="mt-1 px-1">
                     <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleReportSubmit();
-                      }}
+                      onSubmit={(e) => { e.preventDefault(); handleReportSubmit(); }}
                       className="flex gap-1"
                     >
                       <input
@@ -217,8 +181,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavClick}
               title={collapsed ? item.label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 min-h-[44px] ${
                 isActive
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                   : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
@@ -236,7 +201,7 @@ export function Sidebar() {
         <button
           onClick={() => setHighContrast(!highContrast)}
           title="Toggle high contrast"
-          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${
+          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors min-h-[44px] ${
             highContrast
               ? "bg-amber-500/15 text-amber-400"
               : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"
@@ -287,22 +252,16 @@ export function Sidebar() {
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="text-xs text-zinc-500">
-                    {teams.length} teams
-                  </p>
+                  <p className="text-xs text-zinc-500">{teams.length} teams</p>
                   {lastUpdated && (
-                    <span className="text-xs text-zinc-600">
-                      &middot; {formatTimeAgo(lastUpdated)}
-                    </span>
+                    <span className="text-xs text-zinc-600">&middot; {formatTimeAgo(lastUpdated)}</span>
                   )}
                 </div>
               </>
             )}
           </div>
         ) : (
-          !collapsed && (
-            <p className="text-xs text-zinc-600">No event loaded</p>
-          )
+          !collapsed && <p className="text-xs text-zinc-600">No event loaded</p>
         )}
         {!collapsed && (
           <p className="text-xs text-zinc-500 mt-3">
@@ -318,6 +277,90 @@ export function Sidebar() {
           </p>
         )}
       </div>
-    </aside>
+    </>
+  );
+}
+
+// ── Exported Sidebar ──
+
+export function Sidebar({
+  mobileOpen,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Auto-collapse between 768-1024px; expand at 1024px+
+  useEffect(() => {
+    function handleResize() {
+      const w = window.innerWidth;
+      if (w >= 768 && w < 1024) setCollapsed(true);
+      else if (w >= 1024) setCollapsed(false);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return (
+    <>
+      {/* ── Desktop sidebar (md+) ── */}
+      <aside
+        className={`hidden md:flex sticky top-0 h-screen flex-col bg-zinc-900 border-r border-[var(--border)] transition-[width] duration-200 shrink-0 ${
+          collapsed ? "w-16" : "w-60"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          {!collapsed && (
+            <h1 className="text-lg font-bold text-white tracking-tight">
+              PickList<span className="text-[var(--accent)]">FTC</span>
+            </h1>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <svg
+              className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+        </div>
+
+        <SidebarContent collapsed={collapsed} />
+      </aside>
+
+      {/* ── Mobile overlay (< md) ── */}
+      {mobileOpen && (
+        <aside className="fixed inset-y-0 left-0 z-[60] w-72 flex flex-col bg-zinc-900 border-r border-[var(--border)] shadow-2xl md:hidden">
+          {/* Mobile header */}
+          <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+            <h1 className="text-lg font-bold text-white tracking-tight">
+              PickList<span className="text-[var(--accent)]">FTC</span>
+            </h1>
+            <button
+              onClick={onMobileClose}
+              aria-label="Close menu"
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <SidebarContent collapsed={false} onNavClick={onMobileClose} />
+        </aside>
+      )}
+    </>
   );
 }
