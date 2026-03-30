@@ -29,6 +29,8 @@ async function gqlFetch<T>(query: string, variables: Record<string, unknown>): P
 const EVENT_QUERY = `
   query GetEvent($code: String!, $season: Int!) {
     eventByCode(code: $code, season: $season) {
+      code
+      season
       name
       start
       end

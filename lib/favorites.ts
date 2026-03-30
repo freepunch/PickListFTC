@@ -1,5 +1,15 @@
 import { supabase } from "@/lib/supabase";
 
+// ── Helpers ──
+
+/** Ensure a profiles row exists for this user (FK target for favorites). */
+async function ensureProfile(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id: userId }, { onConflict: "id" });
+  if (error) console.error("[favorites] ensureProfile error:", error);
+}
+
 // ── Types ──
 
 export interface FavoriteEvent {
@@ -17,15 +27,28 @@ export interface FavoriteTeam {
 
 // ── localStorage keys ──
 
-const LOCAL_FAV_EVENTS = "picklistftc_fav_events";
-const LOCAL_FAV_TEAMS = "picklistftc_fav_teams";
+const LOCAL_FAV_EVENTS = "plftc:watchedEvents";
+const LOCAL_FAV_TEAMS = "plftc:watchedTeams";
 
 // ── localStorage helpers ──
+
+export function getLocalFavEventsPublic(): FavoriteEvent[] {
+  return getLocalFavEvents();
+}
 
 function getLocalFavEvents(): FavoriteEvent[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_FAV_EVENTS) || "[]");
+    // Migrate from old key name if present
+    const oldKey = "picklistftc_fav_events";
+    const oldData = localStorage.getItem(oldKey);
+    if (oldData && !localStorage.getItem(LOCAL_FAV_EVENTS)) {
+      localStorage.setItem(LOCAL_FAV_EVENTS, oldData);
+      localStorage.removeItem(oldKey);
+    }
+    const parsed: FavoriteEvent[] = JSON.parse(localStorage.getItem(LOCAL_FAV_EVENTS) || "[]");
+    // Filter out corrupt entries (e.g. from earlier bug where event_code was undefined)
+    return parsed.filter((e) => typeof e.event_code === "string" && e.event_code);
   } catch {
     return [];
   }
@@ -35,9 +58,20 @@ function setLocalFavEvents(favs: FavoriteEvent[]) {
   localStorage.setItem(LOCAL_FAV_EVENTS, JSON.stringify(favs));
 }
 
+export function getLocalFavTeamsPublic(): FavoriteTeam[] {
+  return getLocalFavTeams();
+}
+
 function getLocalFavTeams(): FavoriteTeam[] {
   if (typeof window === "undefined") return [];
   try {
+    // Migrate from old key name if present
+    const oldKey = "picklistftc_fav_teams";
+    const oldData = localStorage.getItem(oldKey);
+    if (oldData && !localStorage.getItem(LOCAL_FAV_TEAMS)) {
+      localStorage.setItem(LOCAL_FAV_TEAMS, oldData);
+      localStorage.removeItem(oldKey);
+    }
     return JSON.parse(localStorage.getItem(LOCAL_FAV_TEAMS) || "[]");
   } catch {
     return [];
@@ -55,10 +89,14 @@ export async function loadFavoriteEvents(userId: string | null): Promise<Favorit
   if (!userId) return local;
 
   try {
+    // Verify session is active before querying (RLS requires auth)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return local;
+
     const { data, error } = await supabase
       .from("favorite_events")
       .select("event_code, event_name, season, start")
-      .eq("user_id", userId);
+      .eq("user_id", session.user.id);
 
     if (error) throw error;
     const cloud = (data ?? []) as FavoriteEvent[];
@@ -104,31 +142,40 @@ export async function toggleFavoriteEvent(
   }
 
   try {
-    // Check if exists in Supabase
-    const { data: existing } = await supabase
-      .from("favorite_events")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("event_code", event.event_code)
-      .maybeSingle();
+    // Verify we have an active session (RLS requires auth)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return { favorited: !existsLocally };
+    }
 
-    if (existing) {
-      await supabase
+    if (existsLocally) {
+      // Was favorited, now unfavoriting — delete from Supabase
+      const { data, error } = await supabase
         .from("favorite_events")
         .delete()
-        .eq("user_id", userId)
+        .eq("user_id", session.user.id)
         .eq("event_code", event.event_code);
+      if (error) console.error("[favorites] delete error:", error);
       return { favorited: false };
     } else {
-      await supabase.from("favorite_events").insert({
-        user_id: userId,
-        event_code: event.event_code,
-        event_name: event.event_name,
-        season: event.season,
-      });
+      // Ensure profile row exists (FK target) before inserting favorite
+      await ensureProfile(session.user.id);
+
+      // Not favorited, now adding — upsert to handle duplicates gracefully
+      const { data, error } = await supabase.from("favorite_events").upsert(
+        {
+          user_id: session.user.id,
+          event_code: event.event_code,
+          event_name: event.event_name,
+          season: event.season,
+        },
+        { onConflict: "user_id,event_code,season" }
+      );
+      if (error) console.error("[favorites] upsert error:", error);
       return { favorited: true };
     }
-  } catch {
+  } catch (err) {
+    console.warn("[favorites] toggle failed:", err);
     // Supabase failed, but localStorage is already updated
     return { favorited: !existsLocally };
   }
@@ -141,10 +188,13 @@ export async function loadFavoriteTeams(userId: string | null): Promise<Favorite
   if (!userId) return local;
 
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return local;
+
     const { data, error } = await supabase
       .from("favorite_teams")
       .select("team_number, team_name, notes")
-      .eq("user_id", userId);
+      .eq("user_id", session.user.id);
 
     if (error) throw error;
     const cloud = (data ?? []) as FavoriteTeam[];
@@ -188,31 +238,39 @@ export async function toggleFavoriteTeam(
   }
 
   try {
-    const { data: existing } = await supabase
-      .from("favorite_teams")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("team_number", team.team_number)
-      .maybeSingle();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return { favorited: !existsLocally };
+    }
 
-    if (existing) {
-      await supabase
+    if (existsLocally) {
+      const { data, error } = await supabase
         .from("favorite_teams")
         .delete()
-        .eq("user_id", userId)
+        .eq("user_id", session.user.id)
         .eq("team_number", team.team_number);
+      if (error) console.error("[favorites] delete team error:", error);
+      else console.debug("[favorites] deleted team:", team.team_number, data);
       return { favorited: false };
     } else {
-      await supabase.from("favorite_teams").insert({
-        user_id: userId,
-        team_number: team.team_number,
-        team_name: team.team_name,
-        notes: team.notes,
-      });
+      // Ensure profile row exists (FK target) before inserting favorite
+      await ensureProfile(session.user.id);
+
+      const { data, error } = await supabase.from("favorite_teams").upsert(
+        {
+          user_id: session.user.id,
+          team_number: team.team_number,
+          team_name: team.team_name,
+          notes: team.notes,
+        },
+        { onConflict: "user_id,team_number" }
+      );
+      if (error) console.error("[favorites] upsert team error:", error);
+      else console.debug("[favorites] upserted team:", team.team_number, data);
       return { favorited: true };
     }
-  } catch {
-    // Supabase failed, but localStorage is already updated
+  } catch (err) {
+    console.warn("[favorites] toggle team failed:", err);
     return { favorited: !existsLocally };
   }
 }
@@ -222,6 +280,11 @@ export async function toggleFavoriteTeam(
 export async function migrateLocalFavorites(userId: string): Promise<void> {
   const localEvents = getLocalFavEvents();
   const localTeams = getLocalFavTeams();
+
+  // Ensure profile row exists before migrating (FK target)
+  if (localEvents.length > 0 || localTeams.length > 0) {
+    await ensureProfile(userId);
+  }
 
   if (localEvents.length > 0) {
     const rows = localEvents.map((e) => ({

@@ -397,6 +397,11 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   const [showReportSearch, setShowReportSearch] = useState(false);
   const [reportQuery, setReportQuery] = useState("");
   const [, setTick] = useState(0);
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    setIsMac(navigator.platform.toUpperCase().includes("MAC"));
+  }, []);
 
   const hasEvent = !!event;
 
@@ -547,7 +552,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         <div className="px-3 pb-1">
           <p className="text-[10px] text-zinc-700 flex items-center gap-1.5">
             <kbd className="bg-zinc-800 border border-zinc-700/50 rounded px-1 py-0.5 font-mono text-zinc-600">
-              {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "\u2318K" : "Ctrl+K"}
+              {isMac ? "\u2318K" : "Ctrl+K"}
             </kbd>
             <span>Quick switch</span>
           </p>

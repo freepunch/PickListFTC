@@ -18,6 +18,8 @@ import {
   toggleFavoriteEvent,
   toggleFavoriteTeam,
   migrateLocalFavorites,
+  getLocalFavEventsPublic,
+  getLocalFavTeamsPublic,
 } from "@/lib/favorites";
 import { migrateLocalNotes } from "@/lib/notes";
 import { migrateLocalPickLists } from "@/lib/picklist-sync";
@@ -37,8 +39,8 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const migrationAccepted = useMigrationAccepted();
-  const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>([]);
-  const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>([]);
+  const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>(() => getLocalFavEventsPublic());
+  const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>(() => getLocalFavTeamsPublic());
   const migrationDoneRef = useRef(false);
   const togglingEventsRef = useRef(new Set<string>());
   const togglingTeamsRef = useRef(new Set<number>());
@@ -54,10 +56,25 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavoriteTeams(teams);
   }, [userId]);
 
-  // Reload when user changes
+  // Reload when user changes (merge cloud data with local)
   useEffect(() => {
     refreshFavorites();
   }, [refreshFavorites]);
+
+  // Sync state → localStorage on every change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("plftc:watchedEvents", JSON.stringify(favoriteEvents));
+    } catch { /* quota exceeded or private mode */ }
+  }, [favoriteEvents]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("plftc:watchedTeams", JSON.stringify(favoriteTeams));
+    } catch { /* quota exceeded or private mode */ }
+  }, [favoriteTeams]);
 
   // Run full migration when user accepts the prompt
   useEffect(() => {

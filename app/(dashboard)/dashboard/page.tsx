@@ -379,9 +379,11 @@ function SeasonOverviewOrEmpty() {
   const { favoriteEvents } = useFavorites();
   const { loadEvent, setEventCode } = useEvent();
   const [stats, setStats] = useState({ totalLists: 0, totalTeamsScouted: 0, teamCounts: new Map<number, number>() });
+  const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
     setStats(getPickListStats());
+    setIsMac(navigator.platform.toUpperCase().includes("MAC"));
   }, []);
 
   if (favoriteEvents.length === 0) {
@@ -403,7 +405,7 @@ function SeasonOverviewOrEmpty() {
           Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">/</kbd> to focus search
           {" "}&middot;{" "}
           <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">
-            {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "\u2318K" : "Ctrl+K"}
+            {isMac ? "\u2318K" : "Ctrl+K"}
           </kbd> quick switch
         </p>
       </div>

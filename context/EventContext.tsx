@@ -92,7 +92,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
   });
 
   const loadEvent = useCallback(async (code: string) => {
-    setState((prev) => ({ ...prev, loading: true, error: null, eventCode: code }));
+    setState((prev) => ({ ...prev, event: null, teams: [], loading: true, error: null, eventCode: code, selectedTeams: [] }));
     try {
       const event = await getEventData(code);
       const prescout = isEventPrescout(event);
