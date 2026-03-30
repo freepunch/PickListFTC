@@ -18,8 +18,6 @@ import {
   toggleFavoriteEvent,
   toggleFavoriteTeam,
   migrateLocalFavorites,
-  getLocalFavEventsPublic,
-  getLocalFavTeamsPublic,
 } from "@/lib/favorites";
 import { migrateLocalNotes } from "@/lib/notes";
 import { migrateLocalPickLists } from "@/lib/picklist-sync";
@@ -39,8 +37,9 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const migrationAccepted = useMigrationAccepted();
-  const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>(() => getLocalFavEventsPublic());
-  const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>(() => getLocalFavTeamsPublic());
+  const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>([]);
+  const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>([]);
+  const loadedRef = useRef(false);
   const migrationDoneRef = useRef(false);
   const togglingEventsRef = useRef(new Set<string>());
   const togglingTeamsRef = useRef(new Set<number>());
@@ -56,21 +55,24 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavoriteTeams(teams);
   }, [userId]);
 
-  // Reload when user changes (merge cloud data with local)
+  // Reload when user changes — clear stale state first to prevent data leaking between users
   useEffect(() => {
-    refreshFavorites();
+    loadedRef.current = false;
+    setFavoriteEvents([]);
+    setFavoriteTeams([]);
+    refreshFavorites().then(() => { loadedRef.current = true; });
   }, [refreshFavorites]);
 
-  // Sync state → localStorage on every change
+  // Sync state → localStorage on every change (only after initial load to avoid wiping cache with [])
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !loadedRef.current) return;
     try {
       localStorage.setItem("plftc:watchedEvents", JSON.stringify(favoriteEvents));
     } catch { /* quota exceeded or private mode */ }
   }, [favoriteEvents]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !loadedRef.current) return;
     try {
       localStorage.setItem("plftc:watchedTeams", JSON.stringify(favoriteTeams));
     } catch { /* quota exceeded or private mode */ }
