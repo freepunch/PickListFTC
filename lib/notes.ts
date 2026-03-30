@@ -66,7 +66,9 @@ export function loadNotes(eventCode: string): ScoutNote[] {
 
 export function saveNotes(eventCode: string, notes: ScoutNote[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(storageKey(eventCode), JSON.stringify(notes));
+  try {
+    localStorage.setItem(storageKey(eventCode), JSON.stringify(notes));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 // ── Supabase Cloud Sync ──

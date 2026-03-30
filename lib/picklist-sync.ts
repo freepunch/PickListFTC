@@ -30,7 +30,9 @@ export function loadLocalPickList(code: string): StoredPickList | null {
 
 export function saveLocalPickList(code: string, data: StoredPickList): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(storageKey(code), JSON.stringify(data));
+  try {
+    localStorage.setItem(storageKey(code), JSON.stringify(data));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 // ── Supabase Cloud Sync ──

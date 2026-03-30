@@ -168,6 +168,7 @@ export function QuickSwitcher() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search events..."
+            maxLength={100}
             className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
           />
           <kbd className="text-[10px] text-zinc-600 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 font-mono">

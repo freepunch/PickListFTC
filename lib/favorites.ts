@@ -56,7 +56,9 @@ function getLocalFavEvents(): FavoriteEvent[] {
 }
 
 function setLocalFavEvents(favs: FavoriteEvent[]) {
-  localStorage.setItem(LOCAL_FAV_EVENTS, JSON.stringify(favs));
+  try {
+    localStorage.setItem(LOCAL_FAV_EVENTS, JSON.stringify(favs));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 export function getLocalFavTeamsPublic(): FavoriteTeam[] {
@@ -80,7 +82,9 @@ function getLocalFavTeams(): FavoriteTeam[] {
 }
 
 function setLocalFavTeams(favs: FavoriteTeam[]) {
-  localStorage.setItem(LOCAL_FAV_TEAMS, JSON.stringify(favs));
+  try {
+    localStorage.setItem(LOCAL_FAV_TEAMS, JSON.stringify(favs));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 // ── Favorite Events API ──

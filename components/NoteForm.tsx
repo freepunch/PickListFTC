@@ -22,7 +22,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
   };
 
   const commitCustomTag = () => {
-    const tag = customInput.trim();
+    const tag = customInput.trim().replace(/<[^>]*>/g, "");
     if (tag && !selectedTags.includes(tag)) {
       setSelectedTags((prev) => [...prev, tag]);
     }
@@ -50,7 +50,8 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
       <textarea
         autoFocus
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => setText(e.target.value.slice(0, 1000))}
+        maxLength={1000}
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSave();
@@ -86,7 +87,8 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
         <input
           type="text"
           value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
+          onChange={(e) => setCustomInput(e.target.value.slice(0, 50))}
+          maxLength={50}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") {
               e.preventDefault();

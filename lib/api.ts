@@ -11,13 +11,22 @@ async function gqlFetch<T>(query: string, variables: Record<string, unknown>): P
     next: { revalidate: 120 },
   });
 
+  if (res.status === 429) {
+    throw new Error("Too many requests — please wait a moment and try again");
+  }
+
   if (!res.ok) {
-    throw new Error(`FTC Scout API error: ${res.status} ${res.statusText}`);
+    throw new Error("Failed to load data — please try again");
   }
 
   const json = await res.json();
 
   if (json.errors?.length) {
+    // If we have partial data, log errors but return what we got
+    if (json.data) {
+      console.warn("[api] GraphQL partial errors:", json.errors.map((e: { message: string }) => e.message));
+      return json.data;
+    }
     throw new Error(`GraphQL error: ${json.errors.map((e: { message: string }) => e.message).join(", ")}`);
   }
 
@@ -122,11 +131,25 @@ const EVENT_QUERY = `
   }
 `;
 
+// ── Validation ──
+
+function isValidEventCode(code: string): boolean {
+  return /^[A-Za-z0-9]{1,20}$/.test(code);
+}
+
+function isValidTeamNumber(num: number): boolean {
+  return Number.isInteger(num) && num > 0 && num < 100000;
+}
+
 // ── Fetch functions ──
 
 export async function getEventData(
   eventCode: string
 ): Promise<Event> {
+  if (!isValidEventCode(eventCode)) {
+    throw new Error("Invalid event code");
+  }
+
   const data = await gqlFetch<{ eventByCode: Event }>(EVENT_QUERY, {
     code: eventCode,
     season: CURRENT_SEASON,
@@ -233,6 +256,10 @@ export async function searchEvents(
 }
 
 export async function getTeamReport(teamNumber: number): Promise<TeamReport> {
+  if (!isValidTeamNumber(teamNumber)) {
+    throw new Error("Invalid team number");
+  }
+
   const data = await gqlFetch<{ teamByNumber: TeamReport }>(
     TEAM_REPORT_QUERY,
     { number: teamNumber }

@@ -32,14 +32,16 @@ function getRecentEvents(): RecentEvent[] {
 }
 
 function saveRecentEvent(entry: Omit<RecentEvent, "timestamp">) {
-  const existing = getRecentEvents().filter(
-    (e) => e.code !== entry.code
-  );
-  const updated = [{ ...entry, timestamp: Date.now() }, ...existing].slice(
-    0,
-    MAX_RECENT
-  );
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  try {
+    const existing = getRecentEvents().filter(
+      (e) => e.code !== entry.code
+    );
+    const updated = [{ ...entry, timestamp: Date.now() }, ...existing].slice(
+      0,
+      MAX_RECENT
+    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 function isEventCode(text: string): boolean {
@@ -221,6 +223,7 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
               onFocus={handleFocus}
               onKeyDown={handleKeyDown}
               placeholder="e.g. USTXCMP or Texas"
+              maxLength={100}
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
                 placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
                 focus:ring-1 focus:ring-[var(--accent)]/30 w-full sm:w-64 font-mono transition-colors"
