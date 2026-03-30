@@ -52,7 +52,7 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function EventLoader() {
+export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
   const { loadEvent, loading, error, event, eventCode, setEventCode } =
     useEvent();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -206,7 +206,7 @@ export function EventLoader() {
   const showSearchDropdown = mode === "search" && showDropdown && (searching || searchResults.length > 0);
 
   return (
-    <div className="bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-4">
+    <div className={bare ? "" : "bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-4"}>
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2 sm:gap-3">
         <div className="relative flex-1 min-w-0" ref={containerRef}>
           <label className="block text-xs font-medium text-zinc-500 mb-1.5">

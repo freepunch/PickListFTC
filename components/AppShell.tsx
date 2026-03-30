@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useEvent } from "@/context/EventContext";
 import { Sidebar } from "@/components/Sidebar";
+import { QuickSwitcher } from "@/components/QuickSwitcher";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { highContrast, event, loadEvent, setEventCode } = useEvent();
@@ -52,6 +53,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="flex-1 min-w-0 overflow-x-hidden pt-14 md:pt-0">
         {children}
       </main>
+
+      <QuickSwitcher />
     </div>
   );
 }

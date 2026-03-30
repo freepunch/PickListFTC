@@ -6,17 +6,32 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 import { useEvent } from "@/context/EventContext";
-import { ScoutNote, loadNotes, saveNotes } from "@/lib/notes";
+import { useAuth } from "@/context/AuthContext";
+import {
+  ScoutNote,
+  loadNotes,
+  saveNotes,
+  loadCloudNotes,
+  saveCloudNote,
+  deleteCloudNote,
+  updateCloudNoteShared,
+  mergeNotes,
+  loadTeamSharedNotes,
+} from "@/lib/notes";
 
 interface NotesContextValue {
   notes: ScoutNote[];
+  sharedNotes: ScoutNote[];
   notesForTeam: (teamNumber: number) => ScoutNote[];
+  sharedNotesForTeam: (teamNumber: number) => ScoutNote[];
   teamHasNotes: (teamNumber: number) => boolean;
   addNote: (teamNumber: number, text: string, tags: string[]) => void;
   deleteNote: (id: string) => void;
+  toggleNoteShared: (id: string) => void;
   exportNotes: () => void;
   importNotes: (json: string) => void;
 }
@@ -25,21 +40,61 @@ const NotesContext = createContext<NotesContextValue | null>(null);
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const { eventCode } = useEvent();
+  const { user, profile } = useAuth();
   const [notes, setNotes] = useState<ScoutNote[]>([]);
+  const [sharedNotes, setSharedNotes] = useState<ScoutNote[]>([]);
   const [loadedCode, setLoadedCode] = useState<string>("");
+  const syncingRef = useRef(false);
 
-  // Load notes when event code changes
+  const userId = user?.id ?? null;
+
+  // Load & merge notes when event code changes
   useEffect(() => {
     if (!eventCode || eventCode === loadedCode) return;
-    setNotes(loadNotes(eventCode));
-    setLoadedCode(eventCode);
-  }, [eventCode, loadedCode]);
 
-  // Persist whenever notes change (only after load)
+    const localNotes = loadNotes(eventCode);
+
+    if (!userId) {
+      setNotes(localNotes);
+      setSharedNotes([]);
+      setLoadedCode(eventCode);
+      return;
+    }
+
+    // Merge local + cloud
+    syncingRef.current = true;
+    loadCloudNotes(userId, eventCode).then((cloudNotes) => {
+      const merged = mergeNotes(localNotes, cloudNotes);
+      setNotes(merged);
+      saveNotes(eventCode, merged);
+
+      // Push any local-only notes to cloud
+      const cloudIds = new Set(cloudNotes.map((n) => n.id));
+      const localOnly = merged.filter((n) => !cloudIds.has(n.id));
+      for (const note of localOnly) {
+        saveCloudNote(userId, eventCode, note);
+      }
+
+      syncingRef.current = false;
+    });
+
+    // Load shared team notes
+    if (profile?.team_number) {
+      loadTeamSharedNotes(profile.team_number, eventCode, userId).then(
+        setSharedNotes
+      );
+    } else {
+      setSharedNotes([]);
+    }
+
+    setLoadedCode(eventCode);
+  }, [eventCode, loadedCode, userId, profile?.team_number]);
+
+  // Persist to localStorage whenever notes change (only after load)
   useEffect(() => {
-    if (!eventCode || loadedCode !== eventCode) return;
+    if (!eventCode || loadedCode !== eventCode || syncingRef.current) return;
     saveNotes(eventCode, notes);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
 
   const notesForTeam = useCallback(
@@ -47,9 +102,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [notes]
   );
 
+  const sharedNotesForTeam = useCallback(
+    (teamNumber: number) =>
+      sharedNotes.filter((n) => n.teamNumber === teamNumber),
+    [sharedNotes]
+  );
+
   const teamHasNotes = useCallback(
-    (teamNumber: number) => notes.some((n) => n.teamNumber === teamNumber),
-    [notes]
+    (teamNumber: number) =>
+      notes.some((n) => n.teamNumber === teamNumber) ||
+      sharedNotes.some((n) => n.teamNumber === teamNumber),
+    [notes, sharedNotes]
   );
 
   const addNote = useCallback(
@@ -62,13 +125,41 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         timestamp: new Date().toISOString(),
       };
       setNotes((prev) => [...prev, note]);
+
+      // Cloud sync
+      if (userId && eventCode) {
+        saveCloudNote(userId, eventCode, note);
+      }
     },
-    []
+    [userId, eventCode]
   );
 
-  const deleteNote = useCallback((id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+  const deleteNote = useCallback(
+    (id: string) => {
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      if (userId) {
+        deleteCloudNote(userId, id);
+      }
+    },
+    [userId]
+  );
+
+  const toggleNoteShared = useCallback(
+    (id: string) => {
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === id ? { ...n, shared: !n.shared } : n
+        )
+      );
+      if (userId) {
+        const note = notes.find((n) => n.id === id);
+        if (note) {
+          updateCloudNoteShared(userId, id, !note.shared);
+        }
+      }
+    },
+    [userId, notes]
+  );
 
   const exportNotes = useCallback(() => {
     if (!eventCode) return;
@@ -82,26 +173,48 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   }, [eventCode, notes]);
 
-  const importNotes = useCallback((json: string) => {
-    try {
-      const parsed: unknown = JSON.parse(json);
-      const imported: ScoutNote[] = Array.isArray(parsed)
-        ? (parsed as ScoutNote[])
-        : ((parsed as { notes?: ScoutNote[] }).notes ?? []);
-      if (!Array.isArray(imported)) return;
-      setNotes((prev) => {
-        const existingIds = new Set(prev.map((n) => n.id));
-        const newNotes = imported.filter((n) => !existingIds.has(n.id));
-        return [...prev, ...newNotes];
-      });
-    } catch {
-      // ignore bad JSON
-    }
-  }, []);
+  const importNotes = useCallback(
+    (json: string) => {
+      try {
+        const parsed: unknown = JSON.parse(json);
+        const imported: ScoutNote[] = Array.isArray(parsed)
+          ? (parsed as ScoutNote[])
+          : ((parsed as { notes?: ScoutNote[] }).notes ?? []);
+        if (!Array.isArray(imported)) return;
+        setNotes((prev) => {
+          const existingIds = new Set(prev.map((n) => n.id));
+          const newNotes = imported.filter((n) => !existingIds.has(n.id));
+
+          // Cloud sync new imports
+          if (userId && eventCode) {
+            for (const note of newNotes) {
+              saveCloudNote(userId, eventCode, note);
+            }
+          }
+
+          return [...prev, ...newNotes];
+        });
+      } catch {
+        // ignore bad JSON
+      }
+    },
+    [userId, eventCode]
+  );
 
   return (
     <NotesContext.Provider
-      value={{ notes, notesForTeam, teamHasNotes, addNote, deleteNote, exportNotes, importNotes }}
+      value={{
+        notes,
+        sharedNotes,
+        notesForTeam,
+        sharedNotesForTeam,
+        teamHasNotes,
+        addNote,
+        deleteNote,
+        toggleNoteShared,
+        exportNotes,
+        importNotes,
+      }}
     >
       {children}
     </NotesContext.Provider>

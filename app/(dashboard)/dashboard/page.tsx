@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { useEvent } from "@/context/EventContext";
 import { EventLoader, focusEventInput } from "@/components/EventLoader";
@@ -8,6 +8,7 @@ import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { StatCard } from "@/components/StatCard";
 import { ScoreDistribution } from "@/components/ScoreDistribution";
 import { PrescoutRankedTeam } from "@/lib/types";
+import { useFavorites } from "@/context/FavoritesContext";
 
 function SkeletonCard() {
   return (
@@ -247,6 +248,318 @@ function PrescoutDashboard() {
 
 // ── Main Page ──
 
+function MyEventsSection() {
+  const { favoriteEvents, isEventFavorited, toggleEventFav } = useFavorites();
+  const { loadEvent, setEventCode } = useEvent();
+
+  if (favoriteEvents.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h3 className="text-sm font-semibold text-zinc-200 mb-3">My Events</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {favoriteEvents.map((fav) => (
+          <button
+            key={fav.event_code}
+            onClick={() => {
+              setEventCode(fav.event_code);
+              loadEvent(fav.event_code);
+            }}
+            className="group relative bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-left
+              hover:border-zinc-700 hover:bg-zinc-800/50 transition-all"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-white truncate">
+                  {fav.event_name || fav.event_code}
+                </p>
+                <p className="text-xs text-zinc-500 font-mono mt-1">
+                  {fav.event_code}
+                </p>
+                <p className="text-xs text-zinc-600 mt-0.5">
+                  Season {fav.season}
+                </p>
+              </div>
+              <span
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleEventFav(fav);
+                }}
+                className="p-1 shrink-0"
+              >
+                <svg
+                  className="w-4 h-4 text-amber-400 fill-amber-400"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                </svg>
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Season overview (shown when no event loaded but user has watched events) ──
+
+function getEventStatus(start?: string | null): "live" | "upcoming" | "finished" {
+  if (!start) return "upcoming";
+  const startDate = new Date(start);
+  const now = new Date();
+  const endEstimate = new Date(startDate);
+  endEstimate.setDate(endEstimate.getDate() + 2);
+  if (now < startDate) return "upcoming";
+  if (now > endEstimate) return "finished";
+  return "live";
+}
+
+function getPickListStats(): { totalLists: number; totalTeamsScouted: number; teamCounts: Map<number, number> } {
+  if (typeof window === "undefined") return { totalLists: 0, totalTeamsScouted: 0, teamCounts: new Map() };
+
+  let totalLists = 0;
+  const teamCounts = new Map<number, number>();
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith("picklistftc_picklist_")) continue;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const stored = JSON.parse(raw);
+      if (!stored.entries || stored.entries.length === 0) continue;
+      totalLists++;
+      for (const entry of stored.entries) {
+        teamCounts.set(entry.teamNumber, (teamCounts.get(entry.teamNumber) ?? 0) + 1);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Also count teams with notes
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith("picklistftc_notes_")) continue;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const notes = JSON.parse(raw);
+      if (!Array.isArray(notes)) continue;
+      for (const note of notes) {
+        if (note.teamNumber) {
+          teamCounts.set(note.teamNumber, (teamCounts.get(note.teamNumber) ?? 0) + 1);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return { totalLists, totalTeamsScouted: teamCounts.size, teamCounts };
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  live: "bg-green-400",
+  upcoming: "bg-amber-400",
+  finished: "bg-zinc-600",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  live: "Live",
+  upcoming: "Upcoming",
+  finished: "Finished",
+};
+
+function SeasonOverviewOrEmpty() {
+  const { favoriteEvents } = useFavorites();
+  const { loadEvent, setEventCode } = useEvent();
+  const [stats, setStats] = useState({ totalLists: 0, totalTeamsScouted: 0, teamCounts: new Map<number, number>() });
+
+  useEffect(() => {
+    setStats(getPickListStats());
+  }, []);
+
+  if (favoriteEvents.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-zinc-200 mb-2">
+          No event loaded
+        </h2>
+        <p className="text-sm text-zinc-500 max-w-sm">
+          Enter an FTC event code in the bar above to load team stats,
+          match scores, and OPR breakdowns.
+        </p>
+        <p className="text-xs text-zinc-600 mt-3">
+          Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">/</kbd> to focus search
+          {" "}&middot;{" "}
+          <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">
+            {typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent) ? "\u2318K" : "Ctrl+K"}
+          </kbd> quick switch
+        </p>
+      </div>
+    );
+  }
+
+  // Sort events: upcoming first, then live, then finished
+  const sortedEvents = [...favoriteEvents].sort((a, b) => {
+    const statusOrder = { live: 0, upcoming: 1, finished: 2 };
+    const sa = getEventStatus(a.start);
+    const sb = getEventStatus(b.start);
+    if (statusOrder[sa] !== statusOrder[sb]) return statusOrder[sa] - statusOrder[sb];
+    const da = a.start ? new Date(a.start).getTime() : 0;
+    const db = b.start ? new Date(b.start).getTime() : 0;
+    return da - db;
+  });
+
+  // Find next upcoming event
+  const nextEvent = sortedEvents.find((e) => getEventStatus(e.start) === "upcoming");
+
+  // Top scouted teams
+  const topTeams = Array.from(stats.teamCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const upcomingCount = favoriteEvents.filter((e) => getEventStatus(e.start) === "upcoming").length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-200 mb-1">Season Overview</h2>
+        <p className="text-sm text-zinc-500">Your scouting season at a glance</p>
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Events Watched" value={favoriteEvents.length} mono={false} />
+        <StatCard label="Pick Lists" value={stats.totalLists} mono={false} />
+        <StatCard label="Teams Scouted" value={stats.totalTeamsScouted} mono={false} />
+        <StatCard label="Upcoming" value={upcomingCount} mono={false} subtitle={upcomingCount === 1 ? "event" : "events"} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Watched events */}
+        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-200">My Events</h3>
+          </div>
+          <div className="divide-y divide-zinc-800/50">
+            {sortedEvents.map((ev) => {
+              const status = getEventStatus(ev.start);
+              return (
+                <button
+                  key={ev.event_code}
+                  onClick={() => {
+                    setEventCode(ev.event_code);
+                    loadEvent(ev.event_code);
+                  }}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/50 transition-colors text-left"
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLORS[status]}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">
+                      {ev.event_name ?? ev.event_code}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-[var(--accent)] font-mono">{ev.event_code}</span>
+                      {ev.start && (
+                        <span className="text-xs text-zinc-500">
+                          {new Date(ev.start).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    status === "live" ? "bg-green-500/10 text-green-400"
+                      : status === "upcoming" ? "bg-amber-500/10 text-amber-400"
+                        : "bg-zinc-800 text-zinc-500"
+                  }`}>
+                    {STATUS_LABELS[status]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Next event countdown */}
+          {nextEvent && nextEvent.start && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">
+                Next Event
+              </h3>
+              <p className="text-sm font-medium text-white truncate">
+                {nextEvent.event_name ?? nextEvent.event_code}
+              </p>
+              <p className="text-xs text-zinc-500 mt-1">
+                {new Date(nextEvent.start).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+              {(() => {
+                const days = Math.ceil(
+                  (new Date(nextEvent.start).getTime() - Date.now()) / 86400000
+                );
+                return (
+                  <p className="text-2xl font-bold text-[var(--accent)] mt-2">
+                    {days > 0 ? `${days} day${days !== 1 ? "s" : ""}` : "Today"}
+                  </p>
+                );
+              })()}
+              <button
+                onClick={() => {
+                  setEventCode(nextEvent.event_code);
+                  loadEvent(nextEvent.event_code);
+                }}
+                className="mt-3 w-full py-2 text-xs font-medium bg-[var(--accent)]/15 text-[var(--accent)]
+                  hover:bg-[var(--accent)]/25 rounded-lg transition-colors"
+              >
+                Load Event
+              </button>
+            </div>
+          )}
+
+          {/* Most scouted teams */}
+          {topTeams.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">
+                Most Scouted Teams
+              </h3>
+              <div className="space-y-2">
+                {topTeams.map(([teamNum, count]) => (
+                  <Link
+                    key={teamNum}
+                    href={`/report/${teamNum}`}
+                    className="flex items-center justify-between py-1 hover:bg-zinc-800/50 rounded px-1 -mx-1 transition-colors"
+                  >
+                    <span className="font-mono text-sm text-white">{teamNum}</span>
+                    <span className="text-xs text-zinc-500">
+                      {count} mention{count !== 1 ? "s" : ""}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { event, teams, loading, isPrescout } = useEvent();
 
@@ -307,6 +620,8 @@ export default function DashboardPage() {
       <PrescoutBanner />
 
       <div className="flex-1 p-4 sm:p-6">
+        <MyEventsSection />
+
         {loading && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -321,25 +636,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!event && !loading && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-zinc-200 mb-2">
-              No event loaded
-            </h2>
-            <p className="text-sm text-zinc-500 max-w-sm">
-              Enter an FTC event code in the bar above to load team stats,
-              match scores, and OPR breakdowns.
-            </p>
-            <p className="text-xs text-zinc-600 mt-3">
-              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">/</kbd> to focus search
-            </p>
-          </div>
-        )}
+        {!event && !loading && <SeasonOverviewOrEmpty />}
 
         {event && !loading && isPrescout && <PrescoutDashboard />}
 

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { EventProvider } from "@/context/EventContext";
 import { NotesProvider } from "@/context/NotesContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { FavoritesProvider } from "@/context/FavoritesContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -47,9 +49,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <EventProvider>
-          <NotesProvider>{children}</NotesProvider>
-        </EventProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <EventProvider>
+              <NotesProvider>{children}</NotesProvider>
+            </EventProvider>
+          </FavoritesProvider>
+        </AuthProvider>
         <Analytics />
         <SpeedInsights />
       </body>

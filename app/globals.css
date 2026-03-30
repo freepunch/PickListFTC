@@ -56,6 +56,24 @@ body {
   50% { opacity: 0.7; }
 }
 
+/* Toast fade-in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Drawer slide-in */
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}
+
 .skeleton {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
   background-color: #27272a;

@@ -17,7 +17,9 @@ import { getTeamReport } from "@/lib/api";
 import { getWLT } from "@/lib/calculations";
 import { TeamReport, TeamEventEntry, TeamEventStats2025 } from "@/lib/types";
 import { useEvent } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
 import { useNotes } from "@/context/NotesContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { NoteForm } from "@/components/NoteForm";
 import { tagColorClass } from "@/lib/notes";
 
@@ -176,7 +178,9 @@ export default function TeamReportPage({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { loadEvent, teams: eventTeams } = useEvent();
-  const { notesForTeam, deleteNote } = useNotes();
+  const { notesForTeam, sharedNotesForTeam, deleteNote, toggleNoteShared } = useNotes();
+  const { isTeamFavorited, toggleTeamFav } = useFavorites();
+  const { user, profile } = useAuth();
   const [noteFormOpen, setNoteFormOpen] = useState(false);
 
   useEffect(() => {
@@ -321,6 +325,31 @@ export default function TeamReportPage({
             >
               {strengthProfile.label}
             </span>
+            <button
+              onClick={() =>
+                toggleTeamFav({
+                  team_number: report.number,
+                  team_name: report.name,
+                  notes: null,
+                })
+              }
+              title={isTeamFavorited(report.number) ? "Remove from watched" : "Add to watched"}
+              className="p-1 transition-colors"
+            >
+              <svg
+                className={`w-5 h-5 ${
+                  isTeamFavorited(report.number)
+                    ? "text-amber-400 fill-amber-400"
+                    : "text-zinc-600 hover:text-amber-400"
+                }`}
+                fill={isTeamFavorited(report.number) ? "currentColor" : "none"}
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+              </svg>
+            </button>
           </div>
           <p className="text-base sm:text-lg text-zinc-300">{report.name}</p>
           <p className="text-sm text-zinc-500">
@@ -360,6 +389,9 @@ export default function TeamReportPage({
       {/* Scout Notes */}
       {(() => {
         const teamNotes = notesForTeam(teamNumber);
+        const shared = sharedNotesForTeam(teamNumber);
+        const isLoggedIn = !!user;
+        const hasTeam = !!profile?.team_number;
         return (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -381,7 +413,7 @@ export default function TeamReportPage({
                 <NoteForm teamNumber={teamNumber} onClose={() => setNoteFormOpen(false)} />
               </div>
             )}
-            {teamNotes.length === 0 && !noteFormOpen ? (
+            {teamNotes.length === 0 && shared.length === 0 && !noteFormOpen ? (
               <p className="text-xs text-zinc-600">No notes yet. Click &ldquo;Add Note&rdquo; to record observations.</p>
             ) : (
               <div className="space-y-2">
@@ -406,15 +438,66 @@ export default function TeamReportPage({
                           hour: "2-digit", minute: "2-digit",
                         })}
                       </p>
-                      <button
-                        onClick={() => deleteNote(note.id)}
-                        className="text-[10px] text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover/note:opacity-100"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {isLoggedIn && hasTeam && (
+                          <button
+                            onClick={() => toggleNoteShared(note.id)}
+                            className={`text-[10px] transition-colors ${
+                              note.shared
+                                ? "text-purple-400 hover:text-purple-300"
+                                : "text-zinc-700 hover:text-purple-400 opacity-0 group-hover/note:opacity-100"
+                            }`}
+                            title={note.shared ? "Shared with team" : "Share with my team"}
+                          >
+                            {note.shared ? "Shared" : "Share"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteNote(note.id)}
+                          className="text-[10px] text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover/note:opacity-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
+
+                {/* Shared teammate notes */}
+                {shared.length > 0 && (
+                  <>
+                    {teamNotes.length > 0 && (
+                      <div className="flex items-center gap-2 py-1">
+                        <div className="flex-1 h-px bg-zinc-800" />
+                        <span className="text-[10px] text-purple-400/70 font-medium">Team Notes</span>
+                        <div className="flex-1 h-px bg-zinc-800" />
+                      </div>
+                    )}
+                    {shared.map((note) => (
+                      <div key={note.id} className="bg-purple-500/5 border border-purple-500/10 rounded-lg px-3 py-2.5">
+                        {note.text && (
+                          <p className="text-xs text-zinc-300 mb-2 leading-relaxed">{note.text}</p>
+                        )}
+                        {note.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {note.tags.map((tag) => (
+                              <span key={tag} className={`text-[10px] px-1.5 py-0.5 rounded-full ${tagColorClass(tag)}`}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[10px] text-purple-400/70">
+                          {note.authorName} &middot;{" "}
+                          {new Date(note.timestamp).toLocaleString(undefined, {
+                            month: "short", day: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

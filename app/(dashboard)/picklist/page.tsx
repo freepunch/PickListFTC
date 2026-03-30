@@ -2,9 +2,17 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useEvent } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
 import { rankPartners, penaltyP75 } from "@/lib/calculations";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
+import {
+  StoredPickList,
+  loadLocalPickList,
+  saveLocalPickList,
+  loadCloudPickList,
+  saveCloudPickList,
+} from "@/lib/picklist-sync";
 
 // ── Types ──
 
@@ -16,30 +24,9 @@ interface PickListEntry {
   picked: boolean;
 }
 
-interface StoredPickList {
-  entries: PickListEntry[];
-  myTeamNumber: number | null;
-}
-
 type DragSource =
   | { kind: "available"; teamNumber: number; teamName: string; opr: number }
   | { kind: "picklist"; fromIndex: number };
-
-// ── Storage helpers ──
-
-function storageKey(code: string) {
-  return `picklistftc_picklist_${code}`;
-}
-
-function loadStored(code: string): StoredPickList | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(storageKey(code));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 // ── Drag handle icon ──
 
@@ -61,12 +48,14 @@ function GripIcon() {
 export default function PickListPage() {
   const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading } =
     useEvent();
+  const { user } = useAuth();
 
   const [entries, setEntries] = useState<PickListEntry[]>([]);
   const [myTeamInput, setMyTeamInput] = useState("");
   const [myTeamNumber, setMyTeamNumber] = useState<number | null>(null);
   const [myTeamOpen, setMyTeamOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced">("idle");
 
   const [dragSource, setDragSource] = useState<DragSource | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -75,6 +64,8 @@ export default function PickListPage() {
 
   // Track which event code we've initialized for
   const loadedCodeRef = useRef<string | null>(null);
+  const cloudSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userId = user?.id ?? null;
 
   // Unified team list with OPR values.
   // Uses event.teams as the base so ALL participants appear (not just those
@@ -105,36 +96,74 @@ export default function PickListPage() {
       .sort((a, b) => b.opr - a.opr);
   }, [event, teams, isPrescout, prescoutRanking]);
 
-  // Load from localStorage once per event code
+  // Load from localStorage + cloud once per event code
   useEffect(() => {
     if (!event || loading) return;
     if (isPrescout && prescoutLoading) return;
     if (loadedCodeRef.current === event.code) return;
 
     loadedCodeRef.current = event.code;
-    const saved = loadStored(event.code);
-    if (saved) {
-      setEntries(saved.entries ?? []);
-      if (saved.myTeamNumber) {
-        setMyTeamNumber(saved.myTeamNumber);
-        setMyTeamInput(String(saved.myTeamNumber));
+    const saved = loadLocalPickList(event.code);
+
+    const applyData = (data: StoredPickList | null) => {
+      if (data) {
+        setEntries(data.entries ?? []);
+        if (data.myTeamNumber) {
+          setMyTeamNumber(data.myTeamNumber);
+          setMyTeamInput(String(data.myTeamNumber));
+        } else {
+          setMyTeamNumber(null);
+          setMyTeamInput("");
+        }
       } else {
+        setEntries([]);
         setMyTeamNumber(null);
         setMyTeamInput("");
       }
-    } else {
-      setEntries([]);
-      setMyTeamNumber(null);
-      setMyTeamInput("");
-    }
-  }, [event?.code, loading, isPrescout, prescoutLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    };
 
-  // Persist to localStorage whenever entries or myTeamNumber changes
+    if (userId) {
+      // Try cloud, use newer of local vs cloud
+      loadCloudPickList(userId, event.code).then((cloud) => {
+        if (!cloud) {
+          applyData(saved);
+          return;
+        }
+        const localTime = saved?.updatedAt ? new Date(saved.updatedAt).getTime() : 0;
+        const cloudTime = new Date(cloud.updatedAt).getTime();
+
+        if (cloudTime >= localTime) {
+          applyData(cloud.data);
+          saveLocalPickList(event.code, cloud.data);
+        } else {
+          applyData(saved);
+          // Push local to cloud since it's newer
+          if (saved) saveCloudPickList(userId, event.code, saved);
+        }
+      });
+    } else {
+      applyData(saved);
+    }
+  }, [event?.code, loading, isPrescout, prescoutLoading, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist to localStorage + debounced cloud save
   useEffect(() => {
     if (!event || loadedCodeRef.current !== event.code) return;
-    const data: StoredPickList = { entries, myTeamNumber };
-    localStorage.setItem(storageKey(event.code), JSON.stringify(data));
-  }, [entries, myTeamNumber, event?.code]); // eslint-disable-line react-hooks/exhaustive-deps
+    const data: StoredPickList = { entries, myTeamNumber, updatedAt: new Date().toISOString() };
+    saveLocalPickList(event.code, data);
+
+    // Debounced cloud sync (2 seconds)
+    if (userId) {
+      if (cloudSaveTimerRef.current) clearTimeout(cloudSaveTimerRef.current);
+      setSyncStatus("syncing");
+      cloudSaveTimerRef.current = setTimeout(() => {
+        saveCloudPickList(userId, event.code, data).then(() => {
+          setSyncStatus("synced");
+          setTimeout(() => setSyncStatus("idle"), 2000);
+        });
+      }, 2000);
+    }
+  }, [entries, myTeamNumber, event?.code, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Penalty data for badges
   const penaltyThreshold = useMemo(() => penaltyP75(teams), [teams]);
@@ -452,6 +481,15 @@ export default function PickListPage() {
           <p className="text-xs text-zinc-500 mt-0.5">{event.name}</p>
         </div>
         <div className="flex items-center gap-2">
+          {userId && syncStatus !== "idle" && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              syncStatus === "syncing"
+                ? "text-zinc-500 bg-zinc-800"
+                : "text-green-400 bg-green-500/10"
+            }`}>
+              {syncStatus === "syncing" ? "Syncing..." : "Synced"}
+            </span>
+          )}
           {entries.length > 0 && (
             <span className="text-xs text-zinc-400 bg-zinc-800 px-2.5 py-1 rounded-full border border-zinc-700">
               {takenCount} of {allTeamData.length} teams picked
