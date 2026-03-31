@@ -21,6 +21,7 @@ import {
 } from "@/lib/favorites";
 import { migrateLocalNotes } from "@/lib/notes";
 import { migrateLocalPickLists } from "@/lib/picklist-sync";
+import { favEventsKey, favTeamsKey, migrateUnscopedKeys } from "@/lib/storage";
 
 interface FavoritesContextValue {
   favoriteEvents: FavoriteEvent[];
@@ -55,28 +56,30 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavoriteTeams(teams);
   }, [userId]);
 
-  // Reload when user changes — clear stale state first to prevent data leaking between users
+  // Migrate unscoped keys on user change, then reload
   useEffect(() => {
     loadedRef.current = false;
     setFavoriteEvents([]);
     setFavoriteTeams([]);
+    // Migrate any old unscoped keys to user-scoped keys before loading
+    migrateUnscopedKeys(userId);
     refreshFavorites().then(() => { loadedRef.current = true; });
-  }, [refreshFavorites]);
+  }, [refreshFavorites, userId]);
 
-  // Sync state → localStorage on every change (only after initial load to avoid wiping cache with [])
+  // Sync state → localStorage on every change (scoped by userId)
   useEffect(() => {
     if (typeof window === "undefined" || !loadedRef.current) return;
     try {
-      localStorage.setItem("plftc:watchedEvents", JSON.stringify(favoriteEvents));
+      localStorage.setItem(favEventsKey(userId), JSON.stringify(favoriteEvents));
     } catch { /* quota exceeded or private mode */ }
-  }, [favoriteEvents]);
+  }, [favoriteEvents, userId]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !loadedRef.current) return;
     try {
-      localStorage.setItem("plftc:watchedTeams", JSON.stringify(favoriteTeams));
+      localStorage.setItem(favTeamsKey(userId), JSON.stringify(favoriteTeams));
     } catch { /* quota exceeded or private mode */ }
-  }, [favoriteTeams]);
+  }, [favoriteTeams, userId]);
 
   // Run full migration when user accepts the prompt
   useEffect(() => {

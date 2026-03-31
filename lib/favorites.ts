@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { favEventsKey, favTeamsKey } from "@/lib/storage";
 
 // ── Helpers ──
 
@@ -25,29 +26,12 @@ export interface FavoriteTeam {
   notes: string | null;
 }
 
-// ── localStorage keys ──
+// ── localStorage helpers (all keys scoped by userId) ──
 
-const LOCAL_FAV_EVENTS = "plftc:watchedEvents";
-const LOCAL_FAV_TEAMS = "plftc:watchedTeams";
-
-// ── localStorage helpers ──
-
-/** @deprecated No longer used — favorites initialize as [] and load via useEffect */
-export function getLocalFavEventsPublic(): FavoriteEvent[] {
-  return getLocalFavEvents();
-}
-
-function getLocalFavEvents(): FavoriteEvent[] {
+function getLocalFavEvents(userId?: string | null): FavoriteEvent[] {
   if (typeof window === "undefined") return [];
   try {
-    // Migrate from old key name if present
-    const oldKey = "picklistftc_fav_events";
-    const oldData = localStorage.getItem(oldKey);
-    if (oldData && !localStorage.getItem(LOCAL_FAV_EVENTS)) {
-      localStorage.setItem(LOCAL_FAV_EVENTS, oldData);
-      localStorage.removeItem(oldKey);
-    }
-    const parsed: FavoriteEvent[] = JSON.parse(localStorage.getItem(LOCAL_FAV_EVENTS) || "[]");
+    const parsed: FavoriteEvent[] = JSON.parse(localStorage.getItem(favEventsKey(userId)) || "[]");
     // Filter out corrupt entries (e.g. from earlier bug where event_code was undefined)
     return parsed.filter((e) => typeof e.event_code === "string" && e.event_code);
   } catch {
@@ -55,47 +39,36 @@ function getLocalFavEvents(): FavoriteEvent[] {
   }
 }
 
-function setLocalFavEvents(favs: FavoriteEvent[]) {
+function setLocalFavEvents(favs: FavoriteEvent[], userId?: string | null) {
   try {
-    localStorage.setItem(LOCAL_FAV_EVENTS, JSON.stringify(favs));
+    localStorage.setItem(favEventsKey(userId), JSON.stringify(favs));
   } catch { /* quota exceeded or private mode */ }
 }
 
-export function getLocalFavTeamsPublic(): FavoriteTeam[] {
-  return getLocalFavTeams();
-}
-
-function getLocalFavTeams(): FavoriteTeam[] {
+function getLocalFavTeams(userId?: string | null): FavoriteTeam[] {
   if (typeof window === "undefined") return [];
   try {
-    // Migrate from old key name if present
-    const oldKey = "picklistftc_fav_teams";
-    const oldData = localStorage.getItem(oldKey);
-    if (oldData && !localStorage.getItem(LOCAL_FAV_TEAMS)) {
-      localStorage.setItem(LOCAL_FAV_TEAMS, oldData);
-      localStorage.removeItem(oldKey);
-    }
-    return JSON.parse(localStorage.getItem(LOCAL_FAV_TEAMS) || "[]");
+    return JSON.parse(localStorage.getItem(favTeamsKey(userId)) || "[]");
   } catch {
     return [];
   }
 }
 
-function setLocalFavTeams(favs: FavoriteTeam[]) {
+function setLocalFavTeams(favs: FavoriteTeam[], userId?: string | null) {
   try {
-    localStorage.setItem(LOCAL_FAV_TEAMS, JSON.stringify(favs));
+    localStorage.setItem(favTeamsKey(userId), JSON.stringify(favs));
   } catch { /* quota exceeded or private mode */ }
 }
 
 // ── Favorite Events API ──
 
 export async function loadFavoriteEvents(userId: string | null): Promise<FavoriteEvent[]> {
-  if (!userId) return getLocalFavEvents();
+  if (!userId) return getLocalFavEvents(null);
 
   try {
     // Verify session is active before querying (RLS requires auth)
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return getLocalFavEvents();
+    if (!session) return getLocalFavEvents(userId);
 
     const { data, error } = await supabase
       .from("favorite_events")
@@ -106,10 +79,10 @@ export async function loadFavoriteEvents(userId: string | null): Promise<Favorit
     const cloud = (data ?? []) as FavoriteEvent[];
 
     // When signed in, cloud is the source of truth — replace localStorage
-    setLocalFavEvents(cloud);
+    setLocalFavEvents(cloud, userId);
     return cloud;
   } catch {
-    return getLocalFavEvents();
+    return getLocalFavEvents(userId);
   }
 }
 
@@ -119,13 +92,13 @@ export async function toggleFavoriteEvent(
 ): Promise<{ favorited: boolean }> {
   if (!userId) {
     // localStorage only
-    const local = getLocalFavEvents();
+    const local = getLocalFavEvents(null);
     const exists = local.some((e) => e.event_code === event.event_code);
     if (exists) {
-      setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code));
+      setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code), null);
       return { favorited: false };
     } else {
-      setLocalFavEvents([...local, event]);
+      setLocalFavEvents([...local, event], null);
       return { favorited: true };
     }
   }
@@ -134,19 +107,19 @@ export async function toggleFavoriteEvent(
     // Verify we have an active session (RLS requires auth)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      // No session — fall back to localStorage-only (same as anonymous)
-      const local = getLocalFavEvents();
+      // No session — fall back to localStorage-only with userId scope
+      const local = getLocalFavEvents(userId);
       const exists = local.some((e) => e.event_code === event.event_code);
       if (exists) {
-        setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code));
+        setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code), userId);
       } else {
-        setLocalFavEvents([...local, event]);
+        setLocalFavEvents([...local, event], userId);
       }
       return { favorited: !exists };
     }
 
     // Determine current state from localStorage (kept in sync with cloud)
-    const local = getLocalFavEvents();
+    const local = getLocalFavEvents(userId);
     const existsLocally = local.some((e) => e.event_code === event.event_code);
 
     if (existsLocally) {
@@ -158,7 +131,7 @@ export async function toggleFavoriteEvent(
         .eq("event_code", event.event_code);
       if (error) console.error("[favorites] delete error:", error);
       // Update localStorage to match cloud state
-      setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code));
+      setLocalFavEvents(local.filter((e) => e.event_code !== event.event_code), userId);
       return { favorited: false };
     } else {
       // Ensure profile row exists (FK target) before inserting favorite
@@ -176,7 +149,7 @@ export async function toggleFavoriteEvent(
       );
       if (error) console.error("[favorites] upsert error:", error);
       // Update localStorage to match cloud state
-      setLocalFavEvents([...local, event]);
+      setLocalFavEvents([...local, event], userId);
       return { favorited: true };
     }
   } catch (err) {
@@ -188,11 +161,11 @@ export async function toggleFavoriteEvent(
 // ── Favorite Teams API ──
 
 export async function loadFavoriteTeams(userId: string | null): Promise<FavoriteTeam[]> {
-  if (!userId) return getLocalFavTeams();
+  if (!userId) return getLocalFavTeams(null);
 
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return getLocalFavTeams();
+    if (!session) return getLocalFavTeams(userId);
 
     const { data, error } = await supabase
       .from("favorite_teams")
@@ -203,10 +176,10 @@ export async function loadFavoriteTeams(userId: string | null): Promise<Favorite
     const cloud = (data ?? []) as FavoriteTeam[];
 
     // When signed in, cloud is the source of truth — replace localStorage
-    setLocalFavTeams(cloud);
+    setLocalFavTeams(cloud, userId);
     return cloud;
   } catch {
-    return getLocalFavTeams();
+    return getLocalFavTeams(userId);
   }
 }
 
@@ -215,13 +188,13 @@ export async function toggleFavoriteTeam(
   team: FavoriteTeam
 ): Promise<{ favorited: boolean }> {
   if (!userId) {
-    const local = getLocalFavTeams();
+    const local = getLocalFavTeams(null);
     const exists = local.some((t) => t.team_number === team.team_number);
     if (exists) {
-      setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number));
+      setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number), null);
       return { favorited: false };
     } else {
-      setLocalFavTeams([...local, team]);
+      setLocalFavTeams([...local, team], null);
       return { favorited: true };
     }
   }
@@ -229,19 +202,19 @@ export async function toggleFavoriteTeam(
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      // No session — fall back to localStorage-only (same as anonymous)
-      const local = getLocalFavTeams();
+      // No session — fall back to localStorage-only with userId scope
+      const local = getLocalFavTeams(userId);
       const exists = local.some((t) => t.team_number === team.team_number);
       if (exists) {
-        setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number));
+        setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number), userId);
       } else {
-        setLocalFavTeams([...local, team]);
+        setLocalFavTeams([...local, team], userId);
       }
       return { favorited: !exists };
     }
 
     // Determine current state from localStorage (kept in sync with cloud)
-    const local = getLocalFavTeams();
+    const local = getLocalFavTeams(userId);
     const existsLocally = local.some((t) => t.team_number === team.team_number);
 
     if (existsLocally) {
@@ -252,7 +225,7 @@ export async function toggleFavoriteTeam(
         .eq("team_number", team.team_number);
       if (error) console.error("[favorites] delete team error:", error);
       // Update localStorage to match cloud state
-      setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number));
+      setLocalFavTeams(local.filter((t) => t.team_number !== team.team_number), userId);
       return { favorited: false };
     } else {
       // Ensure profile row exists (FK target) before inserting favorite
@@ -269,7 +242,7 @@ export async function toggleFavoriteTeam(
       );
       if (error) console.error("[favorites] upsert team error:", error);
       // Update localStorage to match cloud state
-      setLocalFavTeams([...local, team]);
+      setLocalFavTeams([...local, team], userId);
       return { favorited: true };
     }
   } catch (err) {
@@ -281,8 +254,9 @@ export async function toggleFavoriteTeam(
 // ── Migration: push local favorites to Supabase ──
 
 export async function migrateLocalFavorites(userId: string): Promise<void> {
-  const localEvents = getLocalFavEvents();
-  const localTeams = getLocalFavTeams();
+  // Read from anon scope (data created before login) to migrate to cloud
+  const localEvents = getLocalFavEvents(null);
+  const localTeams = getLocalFavTeams(null);
 
   // Ensure profile row exists before migrating (FK target)
   if (localEvents.length > 0 || localTeams.length > 0) {

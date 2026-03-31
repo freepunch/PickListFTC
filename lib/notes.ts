@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { notesKey, findScopedKeys } from "@/lib/storage";
 
 export interface ScoutNote {
   id: string;
@@ -48,26 +49,22 @@ export function tagColorClass(label: string): string {
   return TAG_COLOR_MAP[getTagCategory(label)];
 }
 
-// ── localStorage Storage ──
+// ── localStorage Storage (scoped by userId) ──
 
-function storageKey(eventCode: string): string {
-  return `picklistftc_notes_${eventCode}`;
-}
-
-export function loadNotes(eventCode: string): ScoutNote[] {
+export function loadNotes(eventCode: string, userId?: string | null): ScoutNote[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(storageKey(eventCode));
+    const raw = localStorage.getItem(notesKey(eventCode, userId));
     return raw ? (JSON.parse(raw) as ScoutNote[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveNotes(eventCode: string, notes: ScoutNote[]): void {
+export function saveNotes(eventCode: string, notes: ScoutNote[], userId?: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(storageKey(eventCode), JSON.stringify(notes));
+    localStorage.setItem(notesKey(eventCode, userId), JSON.stringify(notes));
   } catch { /* quota exceeded or private mode */ }
 }
 
@@ -173,17 +170,17 @@ export function mergeNotes(local: ScoutNote[], cloud: ScoutNote[]): ScoutNote[] 
   );
 }
 
-/** Push all local notes for an event to Supabase (migration). */
+/** Push all local notes (from anon scope) to Supabase for a newly logged-in user. */
 export async function migrateLocalNotes(userId: string): Promise<void> {
   if (typeof window === "undefined") return;
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_notes_")) continue;
-
-    const eventCode = key.replace("picklistftc_notes_", "");
-    const notes = loadNotes(eventCode);
+  // Read from anon scope (migrateUnscopedKeys already moved old keys there)
+  for (const { eventCode } of findScopedKeys("notes", null)) {
+    const notes = loadNotes(eventCode, null);
     if (notes.length === 0) continue;
+
+    // Also save to user-scoped localStorage
+    saveNotes(eventCode, notes, userId);
 
     const rows = notes.map((n) => ({
       id: n.id,

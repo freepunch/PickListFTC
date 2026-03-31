@@ -52,7 +52,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!eventCode || eventCode === loadedCode) return;
 
-    const localNotes = loadNotes(eventCode);
+    const localNotes = loadNotes(eventCode, userId);
 
     if (!userId) {
       setNotes(localNotes);
@@ -66,7 +66,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     loadCloudNotes(userId, eventCode).then((cloudNotes) => {
       const merged = mergeNotes(localNotes, cloudNotes);
       setNotes(merged);
-      saveNotes(eventCode, merged);
+      saveNotes(eventCode, merged, userId);
 
       // Push any local-only notes to cloud
       const cloudIds = new Set(cloudNotes.map((n) => n.id));
@@ -93,9 +93,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // Persist to localStorage whenever notes change (only after load)
   useEffect(() => {
     if (!eventCode || loadedCode !== eventCode || syncingRef.current) return;
-    saveNotes(eventCode, notes);
+    saveNotes(eventCode, notes, userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes]);
+  }, [notes, userId]);
 
   const notesForTeam = useCallback(
     (teamNumber: number) => notes.filter((n) => n.teamNumber === teamNumber),

@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback, FormEvent, useMemo } from "react";
 import { useEvent } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
 import { searchEvents } from "@/lib/api";
 import { EventSearchResult } from "@/lib/types";
 import { ShareButton } from "@/components/SharePopover";
+import { recentEventsKey } from "@/lib/storage";
 
 // Expose the input ref for global keyboard shortcut
 let globalFocusInput: (() => void) | null = null;
@@ -18,29 +20,28 @@ interface RecentEvent {
   timestamp: number;
 }
 
-const STORAGE_KEY = "picklistftc_recent_events";
 const MAX_RECENT = 5;
 const DEBOUNCE_MS = 300;
 
-function getRecentEvents(): RecentEvent[] {
+function getRecentEvents(userId?: string | null): RecentEvent[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return JSON.parse(localStorage.getItem(recentEventsKey(userId)) || "[]");
   } catch {
     return [];
   }
 }
 
-function saveRecentEvent(entry: Omit<RecentEvent, "timestamp">) {
+function saveRecentEvent(entry: Omit<RecentEvent, "timestamp">, userId?: string | null) {
   try {
-    const existing = getRecentEvents().filter(
+    const existing = getRecentEvents(userId).filter(
       (e) => e.code !== entry.code
     );
     const updated = [{ ...entry, timestamp: Date.now() }, ...existing].slice(
       0,
       MAX_RECENT
     );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem(recentEventsKey(userId), JSON.stringify(updated));
   } catch { /* quota exceeded or private mode */ }
 }
 
@@ -57,6 +58,8 @@ function formatDate(iso: string): string {
 export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
   const { loadEvent, loading, error, event, eventCode, setEventCode } =
     useEvent();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [showDropdown, setShowDropdown] = useState(false);
   const [recent, setRecent] = useState<RecentEvent[]>([]);
   const [searchResults, setSearchResults] = useState<EventSearchResult[]>([]);
@@ -87,15 +90,15 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
 
   // Load recent events on mount & after loading
   useEffect(() => {
-    setRecent(getRecentEvents());
-  }, []);
+    setRecent(getRecentEvents(userId));
+  }, [userId]);
 
   useEffect(() => {
     if (event) {
-      saveRecentEvent({ code: eventCode, name: event.name });
-      setRecent(getRecentEvents());
+      saveRecentEvent({ code: eventCode, name: event.name }, userId);
+      setRecent(getRecentEvents(userId));
     }
-  }, [event, eventCode]);
+  }, [event, eventCode, userId]);
 
   // Click-outside to close dropdown
   useEffect(() => {

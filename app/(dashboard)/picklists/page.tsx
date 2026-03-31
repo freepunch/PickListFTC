@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { supabase } from "@/lib/supabase";
 import { EventLoader } from "@/components/EventLoader";
+import { findScopedKeys, picklistKey } from "@/lib/storage";
 
 // ── Types ──
 
@@ -41,15 +42,11 @@ function getEventStatus(code: string): "active" | "archived" {
   return "active";
 }
 
-function getAllLocalPickLists(): PickListCard[] {
+function getAllLocalPickLists(userId?: string | null): PickListCard[] {
   if (typeof window === "undefined") return [];
   const lists: PickListCard[] = [];
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_picklist_")) continue;
-
-    const eventCode = key.replace("picklistftc_picklist_", "");
+  for (const { key, eventCode } of findScopedKeys("picklist", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -191,11 +188,15 @@ export default function PickListsPage() {
   const [showNewPicker, setShowNewPicker] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  const userId = user?.id ?? null;
+
   // Delete a pick list from localStorage and Supabase
   const handleDelete = useCallback(
     async (eventCode: string) => {
-      // Remove from localStorage
-      localStorage.removeItem(`picklistftc_picklist_${eventCode}`);
+      // Remove from localStorage (scoped by user)
+      try {
+        localStorage.removeItem(picklistKey(eventCode, userId));
+      } catch { /* ignore */ }
 
       // Remove from Supabase if logged in
       if (user) {
@@ -214,7 +215,7 @@ export default function PickListsPage() {
       setPickLists((prev) => prev.filter((pl) => pl.eventCode !== eventCode));
       setDeleteConfirm(null);
     },
-    [user]
+    [user, userId]
   );
 
   // Load pick lists from localStorage + Supabase
@@ -222,8 +223,8 @@ export default function PickListsPage() {
     const load = async () => {
       setLoading(true);
 
-      // Get local pick lists
-      const local = getAllLocalPickLists();
+      // Get local pick lists (scoped by user)
+      const local = getAllLocalPickLists(userId);
       const localMap = new Map(local.map((l) => [l.eventCode, l]));
 
       // Get cloud pick lists if logged in
@@ -286,7 +287,7 @@ export default function PickListsPage() {
     };
 
     load();
-  }, [user, favoriteEvents]);
+  }, [user, userId, favoriteEvents]);
 
   const handleOpenPickList = useCallback(
     (eventCode: string) => {
@@ -314,7 +315,7 @@ export default function PickListsPage() {
 
     const getEntries = (code: string): PickListEntry[] => {
       try {
-        const raw = localStorage.getItem(`picklistftc_picklist_${code}`);
+        const raw = localStorage.getItem(picklistKey(code, userId));
         if (!raw) return [];
         const stored: StoredPickList = JSON.parse(raw);
         return stored.entries ?? [];

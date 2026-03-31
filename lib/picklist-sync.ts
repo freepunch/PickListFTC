@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { picklistKey, findScopedKeys } from "@/lib/storage";
 
 export interface StoredPickList {
   entries: {
@@ -12,27 +13,30 @@ export interface StoredPickList {
   updatedAt?: string; // ISO string for sync
 }
 
-// ── localStorage ──
+// ── localStorage (scoped by userId) ──
 
-function storageKey(code: string) {
-  return `picklistftc_picklist_${code}`;
-}
-
-export function loadLocalPickList(code: string): StoredPickList | null {
+export function loadLocalPickList(code: string, userId?: string | null): StoredPickList | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(storageKey(code));
+    const raw = localStorage.getItem(picklistKey(code, userId));
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-export function saveLocalPickList(code: string, data: StoredPickList): void {
+export function saveLocalPickList(code: string, data: StoredPickList, userId?: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(storageKey(code), JSON.stringify(data));
+    localStorage.setItem(picklistKey(code, userId), JSON.stringify(data));
   } catch { /* quota exceeded or private mode */ }
+}
+
+export function removeLocalPickList(code: string, userId?: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(picklistKey(code, userId));
+  } catch { /* ignore */ }
 }
 
 // ── Supabase Cloud Sync ──
@@ -146,17 +150,17 @@ export async function loadTeamPickLists(
   }
 }
 
-/** Migrate all localStorage pick lists to Supabase */
+/** Migrate all localStorage pick lists (from anon scope) to Supabase for a newly logged-in user. */
 export async function migrateLocalPickLists(userId: string): Promise<void> {
   if (typeof window === "undefined") return;
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_picklist_")) continue;
-
-    const eventCode = key.replace("picklistftc_picklist_", "");
-    const stored = loadLocalPickList(eventCode);
+  // Read from anon scope (migrateUnscopedKeys already moved old keys there)
+  for (const { eventCode } of findScopedKeys("picklist", null)) {
+    const stored = loadLocalPickList(eventCode, null);
     if (!stored || stored.entries.length === 0) continue;
+
+    // Also save to user-scoped localStorage
+    saveLocalPickList(eventCode, stored, userId);
 
     try {
       await saveCloudPickList(userId, eventCode, stored);

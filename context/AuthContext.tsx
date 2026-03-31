@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { hasUnscopedData } from "@/lib/storage";
 import type { User, Session } from "@supabase/supabase-js";
 
 export interface Profile {
@@ -34,21 +35,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Check if user has any localStorage scouting data
+// Check if user has any unscoped localStorage scouting data worth migrating
 function hasLocalData(): boolean {
-  if (typeof window === "undefined") return false;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (
-      key &&
-      (key.startsWith("picklistftc_notes_") ||
-        key.startsWith("picklistftc_picklist_"))
-    ) {
-      const val = localStorage.getItem(key);
-      if (val && val !== "[]" && val !== "null") return true;
-    }
-  }
-  return false;
+  return hasUnscopedData();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

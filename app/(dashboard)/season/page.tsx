@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { EventLoader } from "@/components/EventLoader";
 import { StatCard } from "@/components/StatCard";
+import { findScopedKeys, picklistKey, notesKey } from "@/lib/storage";
 
 // ── Types ──
 
@@ -41,19 +42,17 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
   finished: { color: "text-zinc-500",  bg: "bg-zinc-800",     label: "Completed", dot: "bg-zinc-600" },
 };
 
-function getLocalPickLists(): PickListSummary[] {
+function getLocalPickLists(userId?: string | null): PickListSummary[] {
   if (typeof window === "undefined") return [];
   const lists: PickListSummary[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_picklist_")) continue;
+  for (const { key, eventCode } of findScopedKeys("picklist", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const stored = JSON.parse(raw);
       if (!stored.entries || stored.entries.length === 0) continue;
       lists.push({
-        eventCode: key.replace("picklistftc_picklist_", ""),
+        eventCode,
         teamCount: stored.entries.length,
         updatedAt: stored.updatedAt ?? new Date().toISOString(),
       });
@@ -62,19 +61,17 @@ function getLocalPickLists(): PickListSummary[] {
   return lists;
 }
 
-function getLocalNotes(): NoteSummary[] {
+function getLocalNotes(userId?: string | null): NoteSummary[] {
   if (typeof window === "undefined") return [];
   const notes: NoteSummary[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_notes_")) continue;
+  for (const { key, eventCode } of findScopedKeys("notes", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed) || parsed.length === 0) continue;
       notes.push({
-        eventCode: key.replace("picklistftc_notes_", ""),
+        eventCode,
         noteCount: parsed.length,
       });
     } catch { continue; }
@@ -82,23 +79,29 @@ function getLocalNotes(): NoteSummary[] {
   return notes;
 }
 
-function getTopTeams(pickLists: PickListSummary[]): { teamNumber: number; count: number }[] {
+function getTopTeams(userId?: string | null): { teamNumber: number; count: number }[] {
   if (typeof window === "undefined") return [];
   const teamCounts = new Map<number, number>();
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_picklist_") && !key?.startsWith("picklistftc_notes_")) continue;
+  for (const { key } of findScopedKeys("picklist", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw);
-
-      if (key.startsWith("picklistftc_picklist_") && parsed.entries) {
+      if (parsed.entries) {
         for (const entry of parsed.entries) {
           if (entry.teamNumber) teamCounts.set(entry.teamNumber, (teamCounts.get(entry.teamNumber) ?? 0) + 1);
         }
-      } else if (key.startsWith("picklistftc_notes_") && Array.isArray(parsed)) {
+      }
+    } catch { continue; }
+  }
+
+  for (const { key } of findScopedKeys("notes", userId)) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
         for (const note of parsed) {
           if (note.teamNumber) teamCounts.set(note.teamNumber, (teamCounts.get(note.teamNumber) ?? 0) + 1);
         }
@@ -138,6 +141,8 @@ function EventDrawer({
   onClose: () => void;
   onLoad: () => void;
 }) {
+  const { user: authUser } = useAuth();
+  const drawerUserId = authUser?.id ?? null;
   const status = getEventStatus(event.start);
   const cfg = STATUS_CONFIG[status];
 
@@ -146,7 +151,7 @@ function EventDrawer({
   useEffect(() => {
     if (!pickList) { setPreview([]); return; }
     try {
-      const raw = localStorage.getItem(`picklistftc_picklist_${event.event_code}`);
+      const raw = localStorage.getItem(picklistKey(event.event_code, drawerUserId));
       if (!raw) return;
       const stored = JSON.parse(raw);
       setPreview(
@@ -160,13 +165,13 @@ function EventDrawer({
           }))
       );
     } catch { setPreview([]); }
-  }, [pickList, event.event_code]);
+  }, [pickList, event.event_code, drawerUserId]);
 
   // Read recent notes
   const [recentNotes, setRecentNotes] = useState<{ teamNumber: number; text: string; tags: string[] }[]>([]);
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(`picklistftc_notes_${event.event_code}`);
+      const raw = localStorage.getItem(notesKey(event.event_code, drawerUserId));
       if (!raw) return;
       const notes = JSON.parse(raw);
       if (!Array.isArray(notes)) return;
@@ -322,7 +327,8 @@ function EventDrawer({
 
 export default function SeasonPage() {
   const { loadEvent, setEventCode } = useEvent();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  const userId = user?.id ?? null;
   const { favoriteEvents } = useFavorites();
   const router = useRouter();
 
@@ -333,11 +339,11 @@ export default function SeasonPage() {
   const [drawerEvent, setDrawerEvent] = useState<string | null>(null);
 
   useEffect(() => {
-    const pl = getLocalPickLists();
+    const pl = getLocalPickLists(userId);
     setPickLists(pl);
-    setNotes(getLocalNotes());
-    setTopTeams(getTopTeams(pl));
-  }, []);
+    setNotes(getLocalNotes(userId));
+    setTopTeams(getTopTeams(userId));
+  }, [userId]);
 
   const pickListMap = useMemo(
     () => new Map(pickLists.map((p) => [p.eventCode, p])),

@@ -9,6 +9,8 @@ import { StatCard } from "@/components/StatCard";
 import { ScoreDistribution } from "@/components/ScoreDistribution";
 import { PrescoutRankedTeam } from "@/lib/types";
 import { useFavorites } from "@/context/FavoritesContext";
+import { useAuth } from "@/context/AuthContext";
+import { findScopedKeys } from "@/lib/storage";
 
 function SkeletonCard() {
   return (
@@ -318,15 +320,13 @@ function getEventStatus(start?: string | null): "live" | "upcoming" | "finished"
   return "live";
 }
 
-function getPickListStats(): { totalLists: number; totalTeamsScouted: number; teamCounts: Map<number, number> } {
+function getPickListStats(userId?: string | null): { totalLists: number; totalTeamsScouted: number; teamCounts: Map<number, number> } {
   if (typeof window === "undefined") return { totalLists: 0, totalTeamsScouted: 0, teamCounts: new Map() };
 
   let totalLists = 0;
   const teamCounts = new Map<number, number>();
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_picklist_")) continue;
+  for (const { key } of findScopedKeys("picklist", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -342,9 +342,7 @@ function getPickListStats(): { totalLists: number; totalTeamsScouted: number; te
   }
 
   // Also count teams with notes
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("picklistftc_notes_")) continue;
+  for (const { key } of findScopedKeys("notes", userId)) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -378,13 +376,15 @@ const STATUS_LABELS: Record<string, string> = {
 function SeasonOverviewOrEmpty() {
   const { favoriteEvents } = useFavorites();
   const { loadEvent, setEventCode } = useEvent();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [stats, setStats] = useState({ totalLists: 0, totalTeamsScouted: 0, teamCounts: new Map<number, number>() });
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
-    setStats(getPickListStats());
+    setStats(getPickListStats(userId));
     setIsMac(navigator.platform.toUpperCase().includes("MAC"));
-  }, []);
+  }, [userId]);
 
   if (favoriteEvents.length === 0) {
     return (

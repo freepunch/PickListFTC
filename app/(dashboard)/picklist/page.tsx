@@ -103,7 +103,7 @@ export default function PickListPage() {
     if (loadedCodeRef.current === event.code) return;
 
     loadedCodeRef.current = event.code;
-    const saved = loadLocalPickList(event.code);
+    const saved = loadLocalPickList(event.code, userId);
 
     const applyData = (data: StoredPickList | null) => {
       if (data) {
@@ -134,7 +134,7 @@ export default function PickListPage() {
 
         if (cloudTime >= localTime) {
           applyData(cloud.data);
-          saveLocalPickList(event.code, cloud.data);
+          saveLocalPickList(event.code, cloud.data, userId);
         } else {
           applyData(saved);
           // Push local to cloud since it's newer
@@ -150,7 +150,7 @@ export default function PickListPage() {
   useEffect(() => {
     if (!event || loadedCodeRef.current !== event.code) return;
     const data: StoredPickList = { entries, myTeamNumber, updatedAt: new Date().toISOString() };
-    saveLocalPickList(event.code, data);
+    saveLocalPickList(event.code, data, userId);
 
     // Debounced cloud sync (2 seconds)
     if (userId) {
