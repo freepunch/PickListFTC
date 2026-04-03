@@ -144,6 +144,27 @@ export function migrateUnscopedKeys(userId?: string | null): void {
   }
 }
 
+// ── Tutorial key ──
+
+export function tutorialKey(userId?: string | null): string {
+  return scopedKey("tutorialComplete", userId);
+}
+
+export function isTutorialComplete(userId?: string | null): boolean {
+  if (typeof window === "undefined") return true;
+  return !!localStorage.getItem(tutorialKey(userId));
+}
+
+export function setTutorialComplete(userId?: string | null): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(tutorialKey(userId), "1"); } catch {}
+}
+
+export function clearTutorialComplete(userId?: string | null): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(tutorialKey(userId)); } catch {}
+}
+
 /**
  * Check if there are any unscoped legacy keys that need migration.
  */

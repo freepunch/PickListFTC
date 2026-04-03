@@ -4,6 +4,45 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+const HOW_IT_WORKS = [
+  {
+    q: "How do I get started?",
+    a: "Click \"Continue without account\" to go straight to the app. Enter any FTC DECODE event code (like USTXCMP) or search by event name in the loader at the top of the page. All features work instantly — no sign-in required.",
+  },
+  {
+    q: "What is the Leaderboard?",
+    a: "The Leaderboard ranks every team at your event by OPR (Offensive Power Rating), auto score, driver-controlled score, endgame, and consistency. Click any column header to sort. Use Prescout mode before matches start to rank teams by season-wide data.",
+  },
+  {
+    q: "How does the Match Schedule work?",
+    a: "The Schedule tab lists all qualification matches with win probability predictions based on alliance OPR. Expand any match row to see per-team breakdowns. A 'Now' indicator tracks the current match in real time.",
+  },
+  {
+    q: "What does the Pick List do?",
+    a: "The Pick List builder lets you rank teams with drag-and-drop reordering. Mark teams as picked to hide them, attach penalty badges, and compare across events. If you're signed in, your list syncs to the cloud automatically.",
+  },
+  {
+    q: "How do I compare teams head-to-head?",
+    a: "Open the Compare tab and add up to 3 teams by number. You'll get a radar chart overlaying their scoring profiles and a side-by-side stat table — useful for evaluating alliance picks.",
+  },
+  {
+    q: "What is the Partner Finder?",
+    a: "Partner Finder scores every team at the event on how well they complement a chosen robot. It factors in OPR, auto/endgame coverage, and consistency to surface the best alliance combinations.",
+  },
+  {
+    q: "How do Scout Notes work?",
+    a: "On any Team Report page, attach freeform notes and predefined tags (Fast Cycle, Penalty Prone, Consistent, etc.) to any team. Notes are saved locally and, if signed in, synced to your account. You can also opt in to share notes with teammates who have the same team number.",
+  },
+  {
+    q: "What is the Season Dashboard?",
+    a: "Star events from the sidebar footer to watch them. Your Season Dashboard shows a countdown to your next event, pick list stats, your most-scouted teams, and quick access to each watched event's data.",
+  },
+  {
+    q: "Do I need an account?",
+    a: "No — every feature works without an account and data is saved in your browser's local storage. Sign in with Google to sync your pick lists, scout notes, and watched events across devices and to share notes with teammates.",
+  },
+];
+
 const FEATURES = [
   {
     title: "Live Leaderboard",
@@ -92,6 +131,7 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   // If already logged in, redirect straight to dashboard
   useEffect(() => {
@@ -312,6 +352,50 @@ export default function LandingPage() {
           ))}
         </div>
       </main>
+
+      {/* How It Works */}
+      <section id="how-it-works" className="w-full max-w-2xl mx-auto px-6 pb-20 pt-4">
+        <h2 className="text-lg font-semibold text-zinc-200 mb-4">How It Works</h2>
+        <div className="space-y-1">
+          {HOW_IT_WORKS.map((item, i) => {
+            const isOpen = openIdx === i;
+            return (
+              <div
+                key={i}
+                className={`bg-zinc-900 border rounded-xl overflow-hidden transition-colors ${
+                  isOpen ? "border-zinc-600" : "border-zinc-800"
+                }`}
+              >
+                <button
+                  onClick={() => setOpenIdx(isOpen ? null : i)}
+                  className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+                >
+                  <span className={`text-sm font-medium transition-colors ${isOpen ? "text-white" : "text-zinc-300"}`}>
+                    {item.q}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-zinc-500 shrink-0 ml-3 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+                <div
+                  className="overflow-hidden transition-all duration-200"
+                  style={{ maxHeight: isOpen ? "500px" : "0px" }}
+                >
+                  <p className="px-4 pb-4 text-sm text-zinc-400 leading-relaxed border-t border-zinc-800 pt-3">
+                    {item.a}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Footer */}
       <footer className="border-t border-zinc-800 px-6 py-6">
