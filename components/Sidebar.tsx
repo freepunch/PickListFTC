@@ -297,7 +297,7 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
   if (favoriteEvents.length === 0 || collapsed) return null;
 
   return (
-    <div className="border-t border-[var(--border)]">
+    <div data-tutorial="my-events-panel" className="border-t border-[var(--border)]">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-400 transition-colors"

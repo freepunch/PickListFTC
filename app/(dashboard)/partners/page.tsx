@@ -91,7 +91,7 @@ function TeamSelector({
   }, [query, teams]);
 
   return (
-    <div className="relative w-full sm:w-72">
+    <div data-tutorial="partner-search" className="relative w-full sm:w-72">
       <input
         type="text"
         value={query}

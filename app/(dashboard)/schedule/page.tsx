@@ -543,7 +543,7 @@ export default function SchedulePage() {
             ) : (
               <>
                 {/* ── Desktop table (sm+) ── */}
-                <div className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div data-tutorial="match-table" className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm min-w-[580px]">
                       <thead>

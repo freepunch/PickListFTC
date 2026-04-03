@@ -704,7 +704,7 @@ export default function PickListPage() {
         </div>
 
         {/* Right: My Pick List */}
-        <div className={`flex-1 flex flex-col min-h-0 min-w-0 ${mobileTab === "picklist" ? "flex" : "hidden sm:flex"}`}>
+        <div data-tutorial="picklist-area" className={`flex-1 flex flex-col min-h-0 min-w-0 ${mobileTab === "picklist" ? "flex" : "hidden sm:flex"}`}>
           <div className="px-4 py-2.5 border-b border-[var(--border)] shrink-0">
             <p className="text-sm font-medium text-zinc-300">My Pick List</p>
             <p className="text-xs text-zinc-600 mt-0.5">

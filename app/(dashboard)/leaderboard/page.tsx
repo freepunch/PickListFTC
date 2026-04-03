@@ -654,7 +654,7 @@ export default function LeaderboardPage() {
         {event && !loading && !(isPrescout && prescoutLoading) && (
           <div className="space-y-4">
             {/* Tab bar */}
-            <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+            <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
               {tabDefs.map((tab, i) => (
                 <button
                   key={tab.id}

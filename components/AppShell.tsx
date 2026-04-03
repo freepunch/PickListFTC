@@ -8,59 +8,63 @@ import { QuickSwitcher } from "@/components/QuickSwitcher";
 import { Tutorial, TutorialStep } from "@/components/Tutorial";
 import { isTutorialComplete, setTutorialComplete, clearTutorialComplete } from "@/lib/storage";
 
+const DEMO_EVENT_CODE = "USTXDAQ1";
+
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
+    route: "/dashboard",
     targetSelector: "[data-tutorial='event-loader']",
-    title: "Load an Event",
-    text: "Enter any FTC DECODE event code (e.g. USTXCMP) or search by name to pull live team data. You can switch events at any time.",
+    title: "Load Any Event",
+    text: "Search for any FTC event by name or paste an event code. Your data loads instantly — no account needed.",
     position: "bottom",
   },
   {
-    targetSelector: "[data-tutorial='sidebar-nav']",
-    title: "Navigate the App",
-    text: "Use the sidebar to switch between views. Season-level tools are always accessible; event tools activate once an event is loaded.",
-    position: "right",
-  },
-  {
-    targetSelector: "a[href='/leaderboard']",
+    route: "/leaderboard",
+    targetSelector: "[data-tutorial='stat-tabs']",
     title: "Leaderboard",
-    text: "Sort all teams by OPR, auto score, driver-controlled, endgame, or consistency to identify the top performers at your event.",
-    position: "right",
+    text: "The Leaderboard ranks every team. Switch tabs for Auto, Driver-Controlled, and Advanced stats. Click any column header to sort.",
+    position: "bottom",
   },
   {
-    targetSelector: "a[href='/schedule']",
-    title: "Match Schedule",
-    text: "Browse the full match list with win probability predictions and per-alliance OPR breakdowns for every match.",
-    position: "right",
-  },
-  {
-    targetSelector: "a[href='/picklist']",
-    title: "Pick List",
-    text: "Build your alliance pick list with drag-and-drop reordering, picked/available badges, and automatic cloud sync.",
-    position: "right",
-  },
-  {
-    targetSelector: "a[href='/compare']",
-    title: "Compare Teams",
-    text: "Select up to 3 teams to compare side-by-side with a radar chart and detailed stat breakdown table.",
-    position: "right",
-  },
-  {
-    targetSelector: "a[href='/partners']",
+    route: "/partners",
+    targetSelector: "[data-tutorial='partner-search']",
     title: "Partner Finder",
-    text: "Select your team and get a ranked list of the best alliance partners, scored by complementarity and consistency.",
-    position: "right",
+    text: "Partner Finder ranks the best alliance picks for your team. Switch modes to prioritize OPR, auto, consistency, or balanced fit.",
+    position: "bottom",
   },
   {
+    route: "/compare",
+    targetSelector: "[data-tutorial='compare-inputs']",
+    title: "Compare Teams",
+    text: "Compare puts two or three teams side by side with radar charts and stat breakdowns.",
+    position: "bottom",
+  },
+  {
+    route: "/picklist",
+    targetSelector: "[data-tutorial='picklist-area']",
+    title: "Pick List Builder",
+    text: "Build your alliance pick list here. Drag to rank teams, add notes, and mark teams as taken during alliance selection.",
+    position: "top",
+  },
+  {
+    route: "/schedule",
+    targetSelector: "[data-tutorial='match-table']",
+    title: "Match Schedule",
+    text: "View the match schedule with predictions for upcoming matches. Highlight your team to find your games instantly.",
+    position: "top",
+  },
+  {
+    route: "/dashboard",
     targetSelector: "a[href='/season']",
     title: "Season Dashboard",
-    text: "Star events to watch them across the season. Your Season Dashboard shows stats, countdowns, and notes for all watched events.",
+    text: "Star events to track them across the season. Your Season Dashboard shows countdowns, pick list stats, and your top-scouted teams.",
     position: "right",
   },
   {
+    route: "/dashboard",
     targetSelector: "[data-tutorial='sidebar-footer']",
-    title: "Sync Across Devices",
-    text: "Sign in with Google to sync your pick lists and scout notes across all your devices and share with teammates.",
+    title: "You're Ready to Scout",
+    text: "Sign in with Google to sync your data across devices and share scout notes with teammates. Good luck out there.",
     position: "top",
   },
 ];
@@ -70,6 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const tutorialCheckedRef = useRef(false);
 
   // Auto-load event from ?event= URL param on mount (for pages without EventLoader)
@@ -90,20 +95,41 @@ export function AppShell({ children }: { children: ReactNode }) {
     tutorialCheckedRef.current = true;
     const userId = user?.id ?? null;
     if (!isTutorialComplete(userId)) {
-      const t = setTimeout(() => setShowTutorial(true), 600);
-      return () => clearTimeout(t);
+      startTutorial(userId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, user]);
 
   // Listen for replay-tutorial events dispatched from sidebar
   useEffect(() => {
     function handleReplay() {
-      clearTutorialComplete(user?.id ?? null);
-      setShowTutorial(true);
+      const userId = user?.id ?? null;
+      clearTutorialComplete(userId);
+      startTutorial(userId);
     }
     window.addEventListener("plftc:startTutorial", handleReplay);
     return () => window.removeEventListener("plftc:startTutorial", handleReplay);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const startTutorial = async (userId: string | null) => {
+    // If no event loaded yet, load the demo event first
+    const needsDemo = !event;
+    if (needsDemo) {
+      setDemoLoading(true);
+      setShowTutorial(true);
+      try {
+        setEventCode(DEMO_EVENT_CODE);
+        await loadEvent(DEMO_EVENT_CODE);
+      } catch {
+        // Fall through — tutorial will show with empty state
+      } finally {
+        setDemoLoading(false);
+      }
+    } else {
+      setShowTutorial(true);
+    }
+  };
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
@@ -146,7 +172,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <QuickSwitcher />
 
       {showTutorial && (
-        <Tutorial steps={TUTORIAL_STEPS} onComplete={handleTutorialComplete} />
+        <Tutorial
+          steps={TUTORIAL_STEPS}
+          loading={demoLoading}
+          onComplete={handleTutorialComplete}
+        />
       )}
     </div>
   );
