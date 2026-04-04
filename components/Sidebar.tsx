@@ -7,7 +7,78 @@ import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 
-// ── Season-level nav (always accessible) ──
+// ── Nav data ──────────────────────────────────────────────────────────────────
+
+const DASHBOARD_ITEM = {
+  href: "/dashboard",
+  label: "Dashboard",
+  icon: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+    </svg>
+  ),
+};
+
+const SCOUT_NAV = [
+  {
+    href: "/leaderboard",
+    label: "Leaderboard",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/compare",
+    label: "Compare",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/partners",
+    label: "Partner Finder",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/report",
+    label: "Team Report",
+    isReport: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    ),
+  },
+];
+
+const PLAN_NAV = [
+  {
+    href: "/picklist",
+    label: "Pick List",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/schedule",
+    label: "Schedule",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+      </svg>
+    ),
+  },
+];
 
 const SEASON_NAV = [
   {
@@ -39,74 +110,7 @@ const SEASON_NAV = [
   },
 ];
 
-// ── Event-level nav (requires an event to be loaded) ──
-
-const EVENT_NAV = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/leaderboard",
-    label: "Leaderboard",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/schedule",
-    label: "Schedule",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/compare",
-    label: "Compare",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/partners",
-    label: "Partner Finder",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/picklist",
-    label: "Pick List",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/report",
-    label: "Team Report",
-    isReport: true,
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-      </svg>
-    ),
-  },
-];
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatTimeAgo(ts: number): string {
   const seconds = Math.floor((Date.now() - ts) / 1000);
@@ -116,8 +120,6 @@ function formatTimeAgo(ts: number): string {
   const hours = Math.floor(minutes / 60);
   return `${hours}h ago`;
 }
-
-// ── Event status helpers ──
 
 function getEventStatus(start?: string | null): "live" | "upcoming" | "finished" {
   if (!start) return "upcoming";
@@ -136,7 +138,101 @@ const STATUS_DOT: Record<string, string> = {
   finished: "bg-zinc-600",
 };
 
-// ── Team number prompt modal ──
+// ── NavGroup ──────────────────────────────────────────────────────────────────
+
+function NavGroup({
+  label,
+  storageKey,
+  defaultOpen,
+  disabled,
+  collapsed,
+  isMobile,
+  dataTutorial,
+  children,
+}: {
+  label: string;
+  storageKey: string;
+  defaultOpen: boolean;
+  disabled?: boolean;
+  collapsed: boolean;
+  isMobile: boolean;
+  dataTutorial?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  // Sync from localStorage after hydration; mobile is always open
+  useEffect(() => {
+    if (isMobile) { setOpen(true); return; }
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored !== null) setOpen(stored === "1");
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try { localStorage.setItem(storageKey, next ? "1" : "0"); } catch {}
+  };
+
+  // Disabled groups always show their items so users can see what's there
+  const effectiveOpen = disabled ? true : open;
+
+  // In icon-only (collapsed) sidebar: skip group headers, just show icons with a separator
+  if (collapsed) {
+    return (
+      <div data-tutorial={dataTutorial}>
+        <div className="h-px bg-zinc-800 my-1 mx-1" />
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2" data-tutorial={dataTutorial}>
+      {/* Group header */}
+      <div
+        className={`flex items-center justify-between px-3 py-1 rounded-md select-none ${
+          disabled
+            ? "cursor-default"
+            : "cursor-pointer hover:bg-zinc-800/60 transition-colors"
+        }`}
+        onClick={disabled ? undefined : toggle}
+        title={disabled ? "Load an event first" : undefined}
+      >
+        <span
+          className={`text-[10px] font-semibold uppercase tracking-widest ${
+            disabled ? "text-zinc-700" : "text-zinc-500"
+          }`}
+        >
+          {label}
+        </span>
+        {!disabled && (
+          <svg
+            className={`w-3 h-3 text-zinc-600 transition-transform duration-200 ${effectiveOpen ? "" : "-rotate-90"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        )}
+      </div>
+
+      {/* Collapsible content */}
+      <div
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{ maxHeight: effectiveOpen ? "600px" : "0px" }}
+      >
+        <div className="space-y-0.5 pt-0.5 pb-1">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Team number prompt modal ──────────────────────────────────────────────────
 
 function TeamPromptModal() {
   const { updateProfile, dismissTeamPrompt } = useAuth();
@@ -180,7 +276,7 @@ function TeamPromptModal() {
   );
 }
 
-// ── Migration prompt modal ──
+// ── Migration prompt modal ────────────────────────────────────────────────────
 
 function MigrationPromptModal() {
   const { acceptMigration, dismissMigration } = useAuth();
@@ -201,7 +297,7 @@ function MigrationPromptModal() {
   );
 }
 
-// ── User avatar menu ──
+// ── User avatar menu ──────────────────────────────────────────────────────────
 
 function UserMenu({ collapsed }: { collapsed: boolean }) {
   const { user, profile, signOut } = useAuth();
@@ -264,7 +360,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-// ── Sign in button ──
+// ── Sign in button ────────────────────────────────────────────────────────────
 
 function SignInButton({ collapsed }: { collapsed: boolean }) {
   const { signInWithGoogle, loading } = useAuth();
@@ -287,7 +383,7 @@ function SignInButton({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-// ── My Events sidebar section ──
+// ── My Events sidebar section ─────────────────────────────────────────────────
 
 function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSelectEvent?: () => void }) {
   const { favoriteEvents, toggleEventFav } = useFavorites();
@@ -342,7 +438,7 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
   );
 }
 
-// ── Nav link renderer ──
+// ── Nav link renderer ─────────────────────────────────────────────────────────
 
 function NavLink({
   href,
@@ -386,9 +482,17 @@ function NavLink({
   );
 }
 
-// ── Shared sidebar content ──
+// ── Shared sidebar content ────────────────────────────────────────────────────
 
-function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
+function SidebarContent({
+  collapsed,
+  onNavClick,
+  isMobile = false,
+}: {
+  collapsed: boolean;
+  onNavClick?: () => void;
+  isMobile?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { event, teams, lastUpdated, loading, refreshEvent, highContrast, setHighContrast } = useEvent();
@@ -421,112 +525,160 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
     }
   };
 
+  // Report link: click-to-expand inline search
+  const reportActive = pathname.startsWith("/report");
+  const reportNode = (
+    <div key="/report">
+      <button
+        onClick={() => {
+          if (collapsed) {
+            const num = prompt("Enter team number:");
+            if (num) { router.push(`/report/${num}`); onNavClick?.(); }
+          } else {
+            setShowReportSearch(!showReportSearch);
+          }
+        }}
+        title={collapsed ? "Team Report" : undefined}
+        disabled={!hasEvent}
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 min-h-[40px] ${
+          reportActive
+            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+            : !hasEvent
+              ? "text-zinc-700 cursor-not-allowed"
+              : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+        } ${collapsed ? "justify-center" : ""}`}
+      >
+        <span className="shrink-0">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+        </span>
+        {!collapsed && <span>Team Report</span>}
+      </button>
+      {showReportSearch && !collapsed && (
+        <div className="mt-1 px-1">
+          <form onSubmit={(e) => { e.preventDefault(); handleReportSubmit(); }} className="flex gap-1">
+            <input
+              type="text"
+              value={reportQuery}
+              onChange={(e) => setReportQuery(e.target.value)}
+              placeholder="Team #"
+              autoFocus
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] w-full"
+            />
+            <button type="submit" className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <nav data-tutorial="sidebar-nav" className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {/* Season-level nav — always accessible */}
-        {SEASON_NAV.map((item) => {
-          const isActive = item.href === "/season"
-            ? pathname === "/season"
-            : item.href === "/picklists"
-              ? pathname === "/picklists"
-              : pathname.startsWith(item.href);
+      <nav data-tutorial="sidebar-nav" className="flex-1 p-2 overflow-y-auto">
+        {/* Dashboard — always accessible, no group */}
+        <NavLink
+          href={DASHBOARD_ITEM.href}
+          label={DASHBOARD_ITEM.label}
+          icon={DASHBOARD_ITEM.icon}
+          isActive={pathname === "/dashboard"}
+          collapsed={collapsed}
+          onClick={onNavClick}
+        />
 
-          return (
-            <NavLink
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              isActive={isActive}
-              collapsed={collapsed}
-              onClick={onNavClick}
-            />
-          );
-        })}
-
-        {/* Divider with event label */}
-        {!collapsed && (
-          <div className="flex items-center gap-2 pt-3 pb-1 px-1">
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-wider shrink-0">
-              {hasEvent ? event.name.length > 18 ? event.name.slice(0, 18) + "..." : event.name : "Event"}
-            </span>
-            <div className="flex-1 h-px bg-zinc-800" />
-          </div>
-        )}
-        {collapsed && <div className="h-px bg-zinc-800 my-2" />}
-
-        {/* Event-level nav — dimmed when no event */}
-        {EVENT_NAV.map((item) => {
-          const isReport = "isReport" in item && item.isReport;
-          const isActive = isReport
-            ? pathname.startsWith("/report")
-            : item.href === "/picklist"
-              ? pathname === "/picklist"
-              : item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-
-          // Report is special — it has inline search
-          if (isReport) {
+        {/* Scout group */}
+        <NavGroup
+          label="Scout"
+          storageKey="plftc:sidebar:scout"
+          defaultOpen={hasEvent}
+          disabled={!hasEvent}
+          collapsed={collapsed}
+          isMobile={isMobile}
+        >
+          {SCOUT_NAV.map((item) => {
+            if (item.isReport) return reportNode;
+            const isActive = item.href === "/leaderboard"
+              ? pathname.startsWith("/leaderboard")
+              : item.href === "/compare"
+                ? pathname.startsWith("/compare")
+                : item.href === "/partners"
+                  ? pathname.startsWith("/partners")
+                  : false;
             return (
-              <div key={item.href}>
-                <button
-                  onClick={() => {
-                    if (collapsed) {
-                      const num = prompt("Enter team number:");
-                      if (num) { router.push(`/report/${num}`); onNavClick?.(); }
-                    } else {
-                      setShowReportSearch(!showReportSearch);
-                    }
-                  }}
-                  title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 min-h-[40px] ${
-                    isActive
-                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                      : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-                  } ${collapsed ? "justify-center" : ""}`}
-                >
-                  <span className="shrink-0">{item.icon}</span>
-                  {!collapsed && <span>{item.label}</span>}
-                </button>
-                {showReportSearch && !collapsed && (
-                  <div className="mt-1 px-1">
-                    <form onSubmit={(e) => { e.preventDefault(); handleReportSubmit(); }} className="flex gap-1">
-                      <input
-                        type="text"
-                        value={reportQuery}
-                        onChange={(e) => setReportQuery(e.target.value)}
-                        placeholder="Team #"
-                        autoFocus
-                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] w-full"
-                      />
-                      <button type="submit" className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                        </svg>
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </div>
+              <NavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                isActive={isActive}
+                collapsed={collapsed}
+                disabled={!hasEvent}
+                onClick={onNavClick}
+              />
             );
-          }
+          })}
+        </NavGroup>
 
-          return (
-            <NavLink
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              isActive={isActive}
-              collapsed={collapsed}
-              disabled={!hasEvent}
-              onClick={onNavClick}
-            />
-          );
-        })}
+        {/* Plan group */}
+        <NavGroup
+          label="Plan"
+          storageKey="plftc:sidebar:plan"
+          defaultOpen={hasEvent}
+          disabled={!hasEvent}
+          collapsed={collapsed}
+          isMobile={isMobile}
+        >
+          {PLAN_NAV.map((item) => {
+            const isActive = item.href === "/picklist"
+              ? pathname === "/picklist"
+              : pathname.startsWith(item.href);
+            return (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                isActive={isActive}
+                collapsed={collapsed}
+                disabled={!hasEvent}
+                onClick={onNavClick}
+              />
+            );
+          })}
+        </NavGroup>
+
+        {/* Season group */}
+        <NavGroup
+          label="Season"
+          storageKey="plftc:sidebar:season"
+          defaultOpen={!hasEvent}
+          collapsed={collapsed}
+          isMobile={isMobile}
+          dataTutorial="sidebar-season"
+        >
+          {SEASON_NAV.map((item) => {
+            const isActive = item.href === "/season"
+              ? pathname === "/season"
+              : item.href === "/picklists"
+                ? pathname === "/picklists"
+                : pathname.startsWith(item.href);
+            return (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                isActive={isActive}
+                collapsed={collapsed}
+                onClick={onNavClick}
+              />
+            );
+          })}
+        </NavGroup>
       </nav>
 
       {/* My Events panel */}
@@ -643,7 +795,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   );
 }
 
-// ── Exported Sidebar ──
+// ── Exported Sidebar ──────────────────────────────────────────────────────────
 
 export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; onMobileClose?: () => void }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -679,7 +831,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
             </svg>
           </button>
         </div>
-        <SidebarContent collapsed={collapsed} />
+        <SidebarContent collapsed={collapsed} isMobile={false} />
       </aside>
 
       {/* Mobile overlay */}
@@ -695,7 +847,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
               </svg>
             </button>
           </div>
-          <SidebarContent collapsed={false} onNavClick={onMobileClose} />
+          <SidebarContent collapsed={false} onNavClick={onMobileClose} isMobile={true} />
         </aside>
       )}
     </>

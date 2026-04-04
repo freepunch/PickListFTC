@@ -55,7 +55,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     route: "/dashboard",
-    targetSelector: "a[href='/season']",
+    targetSelector: "[data-tutorial='sidebar-season']",
     title: "Season Dashboard",
     text: "Star events to track them across the season. Your Season Dashboard shows countdowns, pick list stats, and your top-scouted teams.",
     position: "right",
