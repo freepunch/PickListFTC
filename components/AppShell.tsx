@@ -10,7 +10,7 @@ import { isTutorialComplete, setTutorialComplete, clearTutorialComplete } from "
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { highContrast, event, loadEvent, setEventCode } = useEvent();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const tutorialCheckedRef = useRef(false);
@@ -27,16 +27,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Launch tutorial on first event load
+  // Launch tutorial on first event load.
+  // Wait for auth to resolve so we don't mistake a loading logged-in user for anonymous.
   useEffect(() => {
-    if (!event || tutorialCheckedRef.current) return;
+    if (!event || authLoading || tutorialCheckedRef.current) return;
     tutorialCheckedRef.current = true;
-    const userId = user?.id ?? null;
-    if (!isTutorialComplete(userId)) {
+
+    if (user) {
+      // Logged-in: only show once, persisted in localStorage
+      if (!isTutorialComplete(user.id)) {
+        setShowTutorial(true);
+      }
+    } else {
+      // Not logged in: show every launch
       setShowTutorial(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, user]);
+  }, [event, user, authLoading]);
 
   // Listen for replay-tutorial events dispatched from sidebar
   useEffect(() => {
@@ -51,7 +58,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
-    setTutorialComplete(user?.id ?? null);
+    // Only persist completion for logged-in users; anonymous users see it every launch
+    if (user?.id) {
+      setTutorialComplete(user.id);
+    }
   };
 
   return (
