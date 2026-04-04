@@ -76,6 +76,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [showTutorial, setShowTutorial] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const tutorialCheckedRef = useRef(false);
+  // Keep a ref to event so startTutorial always sees the current value regardless of closure age
+  const eventRef = useRef(event);
+  useEffect(() => { eventRef.current = event; }, [event]);
 
   // Auto-load event from ?event= URL param on mount (for pages without EventLoader)
   useEffect(() => {
@@ -100,21 +103,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, user]);
 
-  // Listen for replay-tutorial events dispatched from sidebar
-  useEffect(() => {
-    function handleReplay() {
-      const userId = user?.id ?? null;
-      clearTutorialComplete(userId);
-      startTutorial(userId);
-    }
-    window.addEventListener("plftc:startTutorial", handleReplay);
-    return () => window.removeEventListener("plftc:startTutorial", handleReplay);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
   const startTutorial = async (userId: string | null) => {
-    // If no event loaded yet, load the demo event first
-    const needsDemo = !event;
+    // Use ref so we always read the current event, not a stale closure value
+    const needsDemo = !eventRef.current;
     if (needsDemo) {
       setDemoLoading(true);
       setShowTutorial(true);
@@ -130,6 +121,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       setShowTutorial(true);
     }
   };
+
+  // Listen for replay-tutorial events dispatched from sidebar
+  useEffect(() => {
+    function handleReplay() {
+      const userId = user?.id ?? null;
+      clearTutorialComplete(userId);
+      startTutorial(userId);
+    }
+    window.addEventListener("plftc:startTutorial", handleReplay);
+    return () => window.removeEventListener("plftc:startTutorial", handleReplay);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
