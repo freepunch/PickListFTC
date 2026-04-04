@@ -1,339 +1,210 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useRouter, usePathname } from "next/navigation";
-
-export interface TutorialStep {
-  route?: string;
-  targetSelector: string;
-  title: string;
-  text: string;
-  position: "top" | "bottom" | "left" | "right";
-}
 
 interface Props {
-  steps: TutorialStep[];
-  loading?: boolean;
   onComplete: () => void;
 }
 
-const SPOT_PAD = 8;
-const TIP_OFFSET = 14;
-const MARGIN = 16;
+// ── Step definitions ──────────────────────────────────────────────────────────
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** True if the element has non-zero layout (not display:none or hidden via breakpoint). */
-function isLayoutVisible(el: Element): boolean {
-  const r = el.getBoundingClientRect();
-  return r.width > 0 && r.height > 0;
-}
-
-/**
- * Wait for ANY element matching `selector` that is also layout-visible.
- * Uses MutationObserver so it fires as soon as the element appears in the DOM,
- * rather than burning CPU with setInterval.
- * Uses querySelectorAll so it finds the first *visible* match even when there
- * are mobile/desktop duplicates with the same attribute.
- */
-function waitForVisible(selector: string, timeout = 3000): Promise<Element | null> {
-  return new Promise((resolve) => {
-    const check = (): Element | null => {
-      const els = document.querySelectorAll(selector);
-      for (const el of Array.from(els)) {
-        if (isLayoutVisible(el)) return el;
-      }
-      return null;
-    };
-
-    const immediate = check();
-    if (immediate) { resolve(immediate); return; }
-
-    const observer = new MutationObserver(() => {
-      const el = check();
-      if (el) { observer.disconnect(); clearTimeout(timer); resolve(el); }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    const timer = setTimeout(() => {
-      observer.disconnect();
-      resolve(check()); // one last attempt before giving up
-    }, timeout);
-  });
-}
-
-// ── Positioning ───────────────────────────────────────────────────────────────
-
-function computeTooltipPos(
-  preferred: TutorialStep["position"],
-  spotX: number, spotY: number, spotW: number, spotH: number,
-  tipW: number, tipH: number,
-  vw: number, vh: number,
-): { left: number; top: number } {
-  // Flip to opposite side if preferred side doesn't have enough room
-  let pos = preferred;
-  if (pos === "right"  && spotX + spotW + TIP_OFFSET + tipW > vw - MARGIN) pos = "left";
-  if (pos === "left"   && spotX - TIP_OFFSET - tipW < MARGIN)              pos = "right";
-  if (pos === "bottom" && spotY + spotH + TIP_OFFSET + tipH > vh - MARGIN) pos = "top";
-  if (pos === "top"    && spotY - TIP_OFFSET - tipH < MARGIN)              pos = "bottom";
-
-  let left = 0, top = 0;
-  switch (pos) {
-    case "bottom": left = spotX + spotW / 2 - tipW / 2; top = spotY + spotH + TIP_OFFSET; break;
-    case "top":    left = spotX + spotW / 2 - tipW / 2; top = spotY - TIP_OFFSET - tipH;  break;
-    case "right":  left = spotX + spotW + TIP_OFFSET;    top = spotY + spotH / 2 - tipH / 2; break;
-    case "left":   left = spotX - TIP_OFFSET - tipW;     top = spotY + spotH / 2 - tipH / 2; break;
-  }
-
-  // Clamp — tooltip must stay at least MARGIN px from every edge
-  left = Math.max(MARGIN, Math.min(left, vw - tipW - MARGIN));
-  top  = Math.max(MARGIN, Math.min(top,  vh - tipH - MARGIN));
-  return { left, top };
-}
+const STEPS = [
+  {
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 0z" />
+      </svg>
+    ),
+    title: "Find Your Event",
+    text: "Search for any FTC event by name or paste an event code. If the event hasn't started yet, prescout mode kicks in with season-wide data.",
+  },
+  {
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      </svg>
+    ),
+    title: "Leaderboard",
+    text: "Every team ranked by OPR with tabs for Auto, Driver-Controlled, and Advanced stats. Click any column to sort. Click a row to see match details.",
+  },
+  {
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+    title: "Partner Finder",
+    text: "Select your team and see every other team ranked by compatibility. Switch between Balanced, OPR, Auto Priority, DC Priority, and Consistency modes.",
+  },
+  {
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+      </svg>
+    ),
+    title: "Compare Teams",
+    text: "Pick two or three teams for a side-by-side breakdown with radar charts and a complementarity score.",
+  },
+  {
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+      </svg>
+    ),
+    title: "Pick List",
+    text: "Drag and drop to rank teams for alliance selection. Add notes, mark teams as taken, and export a printable list. Each event gets its own list.",
+  },
+  {
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="currentColor">
+        <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+      </svg>
+    ),
+    title: "You're Ready",
+    text: "Star events to watch them, press ⌘K to quick-switch, and check team reports for full-season scouting summaries. Good luck out there.",
+  },
+];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function Tutorial({ steps, loading = false, onComplete }: Props) {
-  const router   = useRouter();
-  const pathname = usePathname();
+export function Tutorial({ onComplete }: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [step, setStep] = useState(0);
+  // Overlay fade: 0 = invisible, 1 = visible
+  const [overlayOpacity, setOverlayOpacity] = useState(0);
+  // Card content opacity for crossfade between steps
+  const [cardOpacity, setCardOpacity] = useState(1);
 
-  const [stepIndex,  setStepIndex]  = useState(0);
-  const [spotRect,   setSpotRect]   = useState<DOMRect | null>(null);
-  const [mounted,    setMounted]    = useState(false);
-  const [navigating, setNavigating] = useState(false);
-
-  // Two-pass positioning: null = measuring pass (tooltip off-screen), object = final position
-  const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number } | null>(null);
-  const tooltipPosRef = useRef<{ left: number; top: number } | null>(null);
-  const tooltipRef    = useRef<HTMLDivElement>(null);
-
-  const step = steps[stepIndex];
-
-  const updateTooltipPos = useCallback((pos: { left: number; top: number } | null) => {
-    tooltipPosRef.current = pos;
-    setTooltipPos(pos);
+  // Fade in on mount
+  useEffect(() => {
+    setMounted(true);
+    // Allow the browser to paint the opacity-0 state before animating in
+    const t = setTimeout(() => setOverlayOpacity(1), 20);
+    return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => { setMounted(true); }, []);
+  const dismiss = () => {
+    setOverlayOpacity(0);
+    setTimeout(onComplete, 200);
+  };
 
-  // ── Escape key ───────────────────────────────────────────────────────────────
-
+  // Escape key
   useEffect(() => {
-    if (!mounted) return;
-    const handle = (e: KeyboardEvent) => { if (e.key === "Escape") onComplete(); };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, [mounted, onComplete]);
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── Step activation ───────────────────────────────────────────────────────────
-  //
-  // Runs whenever stepIndex, pathname, mounted, or loading changes.
-  // - If the step's route differs from the current pathname: push to it and return.
-  //   The effect re-runs automatically when pathname changes (navigation complete).
-  // - Once on the correct route: wait for the target element via MutationObserver,
-  //   scroll it into view, then set its DOMRect to trigger the spotlight.
-
-  useEffect(() => {
-    if (!mounted || loading) return;
-
-    updateTooltipPos(null);
-    setSpotRect(null);
-
-    const target = step.route;
-    if (target && pathname !== target) {
-      console.log(`[Tutorial] step ${stepIndex + 1}: navigating ${pathname} → ${target}`);
-      setNavigating(true);
-      router.push(target);
-      return; // re-runs when pathname changes to target
-    }
-
-    setNavigating(false);
-
-    let cancelled = false;
-
-    (async () => {
-      console.log(`[Tutorial] step ${stepIndex + 1}: waiting for "${step.targetSelector}"`);
-
-      const el = await waitForVisible(step.targetSelector);
-      if (cancelled) return;
-
-      if (!el) {
-        console.warn(`[Tutorial] step ${stepIndex + 1}: "${step.targetSelector}" not found — centering tooltip`);
-        setSpotRect(null);
-        return;
-      }
-
-      console.log(`[Tutorial] step ${stepIndex + 1}: found <${el.tagName.toLowerCase()}> class="${el.className.toString().slice(0, 80)}"`);
-
-      // Scroll into view so the element is on screen before we measure it
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      await new Promise(r => setTimeout(r, 300));
-      if (cancelled) return;
-
-      setSpotRect(el.getBoundingClientRect());
-    })();
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIndex, mounted, loading, pathname]);
-
-  // ── Reset tooltip position when step or spotlight changes ─────────────────
-
-  useEffect(() => {
-    updateTooltipPos(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIndex, spotRect]);
-
-  // ── Two-pass positioning (runs after every render, bails if already placed) ──
-
-  useLayoutEffect(() => {
-    if (loading || navigating) return;
-    if (tooltipPosRef.current !== null) return; // already positioned
-    const el = tooltipRef.current;
-    if (!el) return;
-    const tipW = el.offsetWidth;
-    const tipH = el.offsetHeight;
-    if (tipW === 0 || tipH === 0) return;
-
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    if (!spotRect) {
-      // No spotlight — center the tooltip
-      updateTooltipPos({
-        left: Math.max(MARGIN, Math.min(vw / 2 - tipW / 2, vw - tipW - MARGIN)),
-        top:  Math.max(MARGIN, Math.min(vh / 2 - tipH / 2, vh - tipH - MARGIN)),
-      });
+  const advance = () => {
+    if (step >= STEPS.length - 1) {
+      dismiss();
       return;
     }
-
-    const spotX = spotRect.left  - SPOT_PAD;
-    const spotY = spotRect.top   - SPOT_PAD;
-    const spotW = spotRect.width  + SPOT_PAD * 2;
-    const spotH = spotRect.height + SPOT_PAD * 2;
-    updateTooltipPos(computeTooltipPos(step.position, spotX, spotY, spotW, spotH, tipW, tipH, vw, vh));
-  }); // no deps — intentional; bails via ref check after first placement
-
-  // ── Refresh spotlight on resize / scroll ──────────────────────────────────
-
-  const refreshSpotRect = useCallback(() => {
-    const els = document.querySelectorAll(step.targetSelector);
-    for (const el of Array.from(els)) {
-      if (isLayoutVisible(el)) {
-        setSpotRect(el.getBoundingClientRect());
-        return;
-      }
-    }
-  }, [step.targetSelector]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    window.addEventListener("resize", refreshSpotRect);
-    window.addEventListener("scroll", refreshSpotRect, true);
-    return () => {
-      window.removeEventListener("resize", refreshSpotRect);
-      window.removeEventListener("scroll", refreshSpotRect, true);
-    };
-  }, [refreshSpotRect, mounted]);
-
-  // ── Navigation ────────────────────────────────────────────────────────────
-
-  const goNext = () => {
-    if (stepIndex < steps.length - 1) setStepIndex(stepIndex + 1);
-    else onComplete();
+    // Crossfade: fade out → swap content → fade in
+    setCardOpacity(0);
+    setTimeout(() => {
+      setStep((s) => s + 1);
+      setCardOpacity(1);
+    }, 120);
   };
 
   if (!mounted) return null;
 
-  // ── Loading card (demo event fetching) ───────────────────────────────────
-
-  if (loading) {
-    return createPortal(
-      <div className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center">
-        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 shadow-2xl flex flex-col items-center gap-3 w-64">
-          <div className="w-5 h-5 border-2 border-zinc-600 border-t-[var(--accent)] rounded-full animate-spin" />
-          <p className="text-sm text-zinc-300 font-medium">Loading demo event…</p>
-          <p className="text-xs text-zinc-500 text-center">
-            Pulling live FTC data so you can see the app with real teams.
-          </p>
-        </div>
-      </div>,
-      document.body
-    );
-  }
-
-  // ── Navigating overlay (route transition in progress) ────────────────────
-
-  if (navigating) {
-    return createPortal(
-      <div className="fixed inset-0 z-[200] bg-black/60" />,
-      document.body
-    );
-  }
-
-  // ── Spotlight geometry ────────────────────────────────────────────────────
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const spotX = spotRect ? spotRect.left  - SPOT_PAD : vw / 2 - 100;
-  const spotY = spotRect ? spotRect.top   - SPOT_PAD : vh / 2 - 50;
-  const spotW = spotRect ? spotRect.width  + SPOT_PAD * 2 : 200;
-  const spotH = spotRect ? spotRect.height + SPOT_PAD * 2 : 100;
-
-  const tooltipStyle: React.CSSProperties = {
-    position: "fixed",
-    maxWidth: `min(400px, calc(100vw - ${MARGIN * 2}px))`,
-    ...(tooltipPos
-      ? { left: tooltipPos.left, top: tooltipPos.top, opacity: 1 }
-      : { left: -9999, top: -9999, opacity: 0 }), // hidden during measurement pass
-  };
+  const current = STEPS[step];
+  const isLast = step === STEPS.length - 1;
 
   return createPortal(
-    <div className="fixed inset-0 z-[200]">
-      {/* Spotlight cutout — 4 overlay rects that leave a transparent window */}
-      <div className="fixed bg-black/75" style={{ top: 0, left: 0, right: 0, height: Math.max(0, spotY) }} />
-      <div className="fixed bg-black/75" style={{ top: Math.max(0, spotY + spotH), left: 0, right: 0, bottom: 0 }} />
-      <div className="fixed bg-black/75" style={{ top: spotY, left: 0, width: Math.max(0, spotX), height: spotH }} />
-      <div className="fixed bg-black/75" style={{ top: spotY, left: spotX + spotW, right: 0, height: spotH }} />
-
-      {/* Accent ring around highlighted element */}
-      {spotRect && (
-        <div
-          className="fixed rounded-lg border-2 border-[var(--accent)] pointer-events-none"
-          style={{ top: spotY, left: spotX, width: spotW, height: spotH }}
-        />
-      )}
-
-      {/* Tooltip card */}
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{
+        backgroundColor: `rgba(0,0,0,${overlayOpacity * 0.82})`,
+        transition: "background-color 200ms ease",
+      }}
+    >
+      {/* Card */}
       <div
-        ref={tooltipRef}
-        className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 z-[201]"
-        style={tooltipStyle}
+        className="w-full max-w-lg bg-zinc-900 border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
+        style={{
+          opacity: overlayOpacity,
+          transform: overlayOpacity === 1 ? "translateY(0)" : "translateY(12px)",
+          transition: "opacity 200ms ease, transform 200ms ease",
+        }}
       >
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-xs font-medium text-[var(--accent)]">
-            {stepIndex + 1} / {steps.length}
-          </span>
-          <button
-            onClick={onComplete}
-            className="text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
-          >
-            Skip
-          </button>
+        {/* Progress bar */}
+        <div className="h-0.5 bg-zinc-800">
+          <div
+            className="h-full bg-[var(--accent)] transition-all duration-300 ease-out"
+            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+          />
         </div>
 
-        <h3 className="text-sm font-semibold text-white mb-1">{step.title}</h3>
-        <p className="text-xs text-zinc-400 leading-relaxed mb-4">{step.text}</p>
+        <div className="p-8">
+          {/* Step counter */}
+          <p className="text-xs font-medium text-zinc-500 mb-6 tracking-wider uppercase">
+            {step + 1} of {STEPS.length}
+          </p>
 
-        <button
-          onClick={goNext}
-          className="w-full py-2 text-xs font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors"
-        >
-          {stepIndex < steps.length - 1 ? "Next →" : "Get Started"}
-        </button>
+          {/* Icon + content — crossfade together */}
+          <div
+            style={{
+              opacity: cardOpacity,
+              transition: "opacity 120ms ease",
+            }}
+          >
+            {/* Icon */}
+            <div className="text-[var(--accent)] mb-5">
+              {current.icon}
+            </div>
 
-        <p className="text-[10px] text-zinc-600 mt-2.5 text-right">Esc to exit</p>
+            {/* Title */}
+            <h2 className="text-xl font-bold text-white mb-3 leading-snug">
+              {current.title}
+            </h2>
+
+            {/* Description */}
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              {current.text}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between mt-8">
+            <button
+              onClick={dismiss}
+              className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Skip
+            </button>
+
+            <div className="flex items-center gap-3">
+              {/* Dot indicators */}
+              <div className="flex items-center gap-1.5">
+                {STEPS.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`rounded-full transition-all duration-200 ${
+                      i === step
+                        ? "w-4 h-1.5 bg-[var(--accent)]"
+                        : "w-1.5 h-1.5 bg-zinc-700"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={advance}
+                className="px-5 py-2 text-sm font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors"
+              >
+                {isLast ? "Get Started" : "Next →"}
+              </button>
+            </div>
+          </div>
+
+          {/* Esc hint */}
+          <p className="text-[10px] text-zinc-600 mt-4 text-right">Esc to exit</p>
+        </div>
       </div>
     </div>,
     document.body
