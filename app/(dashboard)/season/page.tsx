@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEvent } from "@/context/EventContext";
@@ -323,10 +323,61 @@ function EventDrawer({
   );
 }
 
+// ── Event loaded toast ──
+
+function EventLoadedToast({
+  eventName,
+  onGo,
+  onDismiss,
+}: {
+  eventName: string;
+  onGo: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in w-full max-w-sm px-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">Event loaded</p>
+              <p className="text-xs text-zinc-400 truncate">{eventName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-zinc-600 hover:text-zinc-400 transition-colors shrink-0 mt-0.5"
+            aria-label="Dismiss"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <button
+          onClick={onGo}
+          className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium
+            bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors"
+        >
+          Go to Dashboard
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Season Dashboard ──
 
 export default function SeasonPage() {
-  const { loadEvent, setEventCode } = useEvent();
+  const { loadEvent, setEventCode, event } = useEvent();
   const { user, profile } = useAuth();
   const userId = user?.id ?? null;
   const { favoriteEvents } = useFavorites();
@@ -337,6 +388,24 @@ export default function SeasonPage() {
   const [topTeams, setTopTeams] = useState<{ teamNumber: number; count: number }[]>([]);
   const [sortMode, setSortMode] = useState<"chronological" | "upcoming" | "recent">("upcoming");
   const [drawerEvent, setDrawerEvent] = useState<string | null>(null);
+  const [eventToast, setEventToast] = useState<{ code: string; name: string } | null>(null);
+
+  // Track the event code that was already loaded when this page mounted,
+  // so we only show the toast for events loaded *on* this page.
+  const initialEventCodeRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (initialEventCodeRef.current === undefined) {
+      initialEventCodeRef.current = event?.code ?? null;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show toast whenever a *new* event finishes loading on this page
+  useEffect(() => {
+    if (!event) return;
+    // Skip the event that was already loaded when the page first mounted
+    if (initialEventCodeRef.current === undefined || event.code === initialEventCodeRef.current) return;
+    setEventToast({ code: event.code, name: event.name });
+  }, [event?.code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const pl = getLocalPickLists(userId);
@@ -415,6 +484,7 @@ export default function SeasonPage() {
   // ── Onboarding empty state ──
   if (favoriteEvents.length === 0) {
     return (
+      <>
       <div className="min-h-screen p-4 sm:p-6">
         <div className="max-w-3xl mx-auto">
           <div className="mb-8">
@@ -443,6 +513,16 @@ export default function SeasonPage() {
           </div>
         </div>
       </div>
+
+      {/* Event loaded toast */}
+      {eventToast && (
+        <EventLoadedToast
+          eventName={eventToast.name}
+          onGo={() => { setEventToast(null); router.push("/dashboard"); }}
+          onDismiss={() => setEventToast(null)}
+        />
+      )}
+      </>
     );
   }
 
@@ -630,6 +710,15 @@ export default function SeasonPage() {
             handleLoadEvent(drawerEventData.event_code);
             setDrawerEvent(null);
           }}
+        />
+      )}
+
+      {/* Event loaded toast */}
+      {eventToast && (
+        <EventLoadedToast
+          eventName={eventToast.name}
+          onGo={() => { setEventToast(null); router.push("/dashboard"); }}
+          onDismiss={() => setEventToast(null)}
         />
       )}
     </div>
