@@ -610,7 +610,7 @@ export default function PickListPage() {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div data-tutorial="picklist-area" className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Available Teams */}
         <div className={`sm:w-72 sm:shrink-0 sm:border-r sm:border-[var(--border)] flex flex-col min-h-0 ${mobileTab === "available" ? "flex w-full" : "hidden sm:flex"}`}>
           <div className="px-4 py-2.5 border-b border-[var(--border)] shrink-0">
@@ -704,7 +704,7 @@ export default function PickListPage() {
         </div>
 
         {/* Right: My Pick List */}
-        <div data-tutorial="picklist-area" className={`flex-1 flex flex-col min-h-0 min-w-0 ${mobileTab === "picklist" ? "flex" : "hidden sm:flex"}`}>
+        <div className={`flex-1 flex flex-col min-h-0 min-w-0 ${mobileTab === "picklist" ? "flex" : "hidden sm:flex"}`}>
           <div className="px-4 py-2.5 border-b border-[var(--border)] shrink-0">
             <p className="text-sm font-medium text-zinc-300">My Pick List</p>
             <p className="text-xs text-zinc-600 mt-0.5">

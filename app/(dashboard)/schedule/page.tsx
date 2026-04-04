@@ -623,7 +623,7 @@ export default function SchedulePage() {
                 </div>
 
                 {/* ── Mobile card list (<sm) ── */}
-                <div className="sm:hidden space-y-2">
+                <div data-tutorial="match-table" className="sm:hidden space-y-2">
                   {visible.map((m) => {
                     const isNow = m.id === nowId;
                     const isExpanded = expandedMatch === m.id;
