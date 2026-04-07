@@ -23,6 +23,8 @@ import {
   getWLT,
 } from "@/lib/calculations";
 import { ProcessedTeam, Match, TeamEventStats2025, PrescoutRankedTeam } from "@/lib/types";
+import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const TEAM_COLORS = [
   { stroke: "#3b82f6", fill: "rgba(59, 130, 246, 0.2)", label: "text-blue-400", bg: "bg-blue-500/15", dot: "bg-blue-500" },
@@ -111,6 +113,14 @@ function TeamSlot({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
             </svg>
           </button>
+          <AddToPickListButton
+            team={{
+              teamNumber: team.teamNumber,
+              teamName: team.teamName,
+              opr: isPrescout && prescoutTeam ? prescoutTeam.bestOpr : team.stats.opr.totalPointsNp,
+            }}
+            size="sm"
+          />
           <Link
             href={`/report/${team.teamNumber}`}
             title="Team Report"
@@ -550,6 +560,7 @@ export default function ComparePage() {
 
   // Local slot state: initialized from context selectedTeams
   const [slots, setSlots] = useState<(number | null)[]>([null, null]);
+  const [copyToast, setCopyToast] = useState(false);
 
   // Restore ?teams= from URL once teams are loaded
   const hasRestoredTeamsRef = useRef(false);
@@ -698,17 +709,49 @@ export default function ComparePage() {
                   Compare Teams
                   {isPrescout && <span className="text-xs text-blue-400 ml-2 font-normal">Season Data</span>}
                 </h2>
-                {slots.length < MAX_SLOTS && (
-                  <button
-                    onClick={addSlot}
-                    className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                    Add team
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {(isPrescout ? selectedPrescoutData : selectedData).length >= 2 && (
+                    <div className="relative">
+                      <button
+                        onClick={async () => {
+                          const teams = isPrescout ? selectedPrescoutData : selectedData;
+                          const lines = teams.map((t) =>
+                            isPrescout
+                              ? `#${(t as PrescoutRankedTeam).teamNumber} ${(t as PrescoutRankedTeam).teamName} — Best OPR ${(t as PrescoutRankedTeam).bestOpr.toFixed(1)}`
+                              : `#${(t as ProcessedTeam).teamNumber} ${(t as ProcessedTeam).teamName} — OPR ${(t as ProcessedTeam).stats.opr.totalPointsNp.toFixed(1)} | Rank #${(t as ProcessedTeam).stats.rank}`
+                          );
+                          const ok = await copyToClipboard(lines.join("\n"));
+                          if (ok) {
+                            setCopyToast(true);
+                            setTimeout(() => setCopyToast(false), 2000);
+                          }
+                        }}
+                        className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy
+                      </button>
+                      {copyToast && (
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 pointer-events-none z-50">
+                          Copied!
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {slots.length < MAX_SLOTS && (
+                    <button
+                      onClick={addSlot}
+                      className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      Add team
+                    </button>
+                  )}
+                </div>
               </div>
               <div data-tutorial="compare-inputs" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {slots.map((slot, i) => (

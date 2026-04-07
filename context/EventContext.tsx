@@ -39,6 +39,22 @@ interface EventContextValue extends EventState {
 
 const EventContext = createContext<EventContextValue | null>(null);
 
+// ── In-memory cache (survives re-renders, cleared on page unload) ─────────────
+interface CacheEntry { event: Event; timestamp: number }
+const eventCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCached(code: string): Event | null {
+  const entry = eventCache.get(code.toUpperCase());
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) { eventCache.delete(code.toUpperCase()); return null; }
+  return entry.event;
+}
+
+function setCached(code: string, event: Event) {
+  eventCache.set(code.toUpperCase(), { event, timestamp: Date.now() });
+}
+
 function isEventPrescout(event: Event): boolean {
   if (!event.matches || event.matches.length === 0) return true;
   return event.matches.every((m) => !m.hasBeenPlayed);
@@ -92,9 +108,26 @@ export function EventProvider({ children }: { children: ReactNode }) {
   });
 
   const loadEvent = useCallback(async (code: string) => {
-    setState((prev) => ({ ...prev, event: null, teams: [], loading: true, error: null, eventCode: code, selectedTeams: [] }));
+    const upper = code.toUpperCase();
+    const cached = getCached(upper);
+    // Serve from cache instantly, then still refresh in background if >2min old
+    if (cached) {
+      const prescout = isEventPrescout(cached);
+      const teams = processTeams(cached, prescout);
+      setState((prev) => ({
+        ...prev, event: cached, teams, loading: false, error: null,
+        eventCode: upper, selectedTeams: [], lastUpdated: eventCache.get(upper)!.timestamp,
+        isPrescout: prescout, showLiveToast: false,
+        ...(prescout ? {} : { prescoutData: [], prescoutRanking: [], prescoutLoading: false }),
+      }));
+      const age = Date.now() - eventCache.get(upper)!.timestamp;
+      if (age < 2 * 60 * 1000) return; // fresh enough — skip background refresh
+    }
+
+    setState((prev) => ({ ...prev, event: cached ?? null, teams: cached ? processTeams(cached, isEventPrescout(cached)) : [], loading: true, error: null, eventCode: upper, selectedTeams: [] }));
     try {
-      const event = await getEventData(code);
+      const event = await getEventData(upper);
+      setCached(upper, event);
       const prescout = isEventPrescout(event);
       const teams = processTeams(event, prescout);
 
@@ -138,6 +171,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const event = await getEventData(code);
+      setCached(code, event);
       const prescout = isEventPrescout(event);
       const teams = processTeams(event, prescout);
       const wasPrescout = state.isPrescout;

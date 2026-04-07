@@ -24,6 +24,8 @@ import { ProcessedTeam, PrescoutRankedTeam } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
+import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { copyToClipboard } from "@/lib/clipboard";
 
 // ── Radar axes (same as compare view) ──
 
@@ -457,6 +459,7 @@ function PartnerRow({
           {result.complementarityTag}
         </span>
         <div className="flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+          <AddToPickListButton team={{ teamNumber: result.teamNumber, teamName: result.teamName, opr: partner?.stats.opr.totalPointsNp ?? 0 }} size="sm" />
           <button onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)} title="Compare" className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
           </button>
@@ -492,6 +495,7 @@ function PartnerRow({
             {result.complementarityTag}
           </span>
           <div className="flex items-center gap-1">
+            <AddToPickListButton team={{ teamNumber: result.teamNumber, teamName: result.teamName, opr: partner?.stats.opr.totalPointsNp ?? 0 }} size="sm" />
             <button onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)} title="Compare" className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
             </button>
@@ -561,6 +565,7 @@ function PrescoutPartnerRow({
           {result.complementarityTag}
         </span>
         <div className="flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+          <AddToPickListButton team={{ teamNumber: result.teamNumber, teamName: result.teamName, opr: partner?.bestOpr ?? 0 }} size="sm" />
           <button onClick={() => router.push(`/compare?teams=${selected.teamNumber},${result.teamNumber}`)} title="Compare" className="p-1.5 rounded-md text-zinc-500 hover:text-[var(--accent)] hover:bg-zinc-800 transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
@@ -685,6 +690,7 @@ export default function PartnersPage() {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [mode, setMode] = useState<PartnerMode>("balanced");
   const [psMode, setPsMode] = useState("balanced");
+  const [copyToast, setCopyToast] = useState(false);
 
   const selectedPrescout = useMemo(
     () => selectedTeam ? prescoutRanking.find((t) => t.teamNumber === selectedTeam.teamNumber) ?? null : null,
@@ -819,7 +825,28 @@ export default function PartnersPage() {
               <span className="text-xs font-medium text-zinc-500">{activeMode.scoreHeader}</span>
               <span className="text-xs font-medium text-zinc-500 text-center">Comb. OPR</span>
               <span className="text-xs font-medium text-zinc-500">Tag</span>
-              <span className="text-xs font-medium text-zinc-500 text-right">Actions</span>
+              <div className="flex items-center justify-end gap-2">
+                <div className="relative">
+                  <button
+                    onClick={async () => {
+                      const top10 = ranked.slice(0, 10);
+                      const lines = top10.map((r, i) => `${i + 1}. #${r.teamNumber} ${r.teamName} (Score: ${r.score})`);
+                      const text = `Top Partners for #${selectedTeam.teamNumber}\n${lines.join("\n")}`;
+                      const ok = await copyToClipboard(text);
+                      if (ok) { setCopyToast(true); setTimeout(() => setCopyToast(false), 2000); }
+                    }}
+                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Copy Top 10
+                  </button>
+                  {copyToast && (
+                    <span className="absolute top-full right-0 mt-1.5 whitespace-nowrap text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 pointer-events-none z-50">
+                      Copied!
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-medium text-zinc-500">Actions</span>
+              </div>
             </div>
             {ranked.map((result, idx) => (
               <PartnerRow

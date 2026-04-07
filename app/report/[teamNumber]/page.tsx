@@ -23,6 +23,8 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { NoteForm } from "@/components/NoteForm";
 import { tagColorClass } from "@/lib/notes";
 import { exportScoutReportPDF } from "@/lib/pdf-export";
+import { copyToClipboard } from "@/lib/clipboard";
+import { AddToPickListButton } from "@/components/AddToPickListButton";
 
 // ── Executive summary builder ──
 
@@ -184,6 +186,7 @@ export default function TeamReportPage({
   const { user, profile } = useAuth();
   const [noteFormOpen, setNoteFormOpen] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [copySummaryToast, setCopySummaryToast] = useState(false);
 
   useEffect(() => {
     if (isNaN(teamNumber)) {
@@ -364,6 +367,14 @@ export default function TeamReportPage({
           </p>
         </div>
         <div className="sm:text-right shrink-0 flex flex-col items-end gap-2">
+          <AddToPickListButton
+            team={{
+              teamNumber: report.number,
+              teamName: report.name,
+              opr: allStats.length > 0 ? Math.max(...allStats.map((s) => s.opr.totalPointsNp)) : 0,
+            }}
+            size="sm"
+          />
           <span className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-zinc-300">
             <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
@@ -371,30 +382,55 @@ export default function TeamReportPage({
             <span className="font-mono">{eventsWithStats.length}</span>
             event{eventsWithStats.length !== 1 ? "s" : ""} this season
           </span>
-          <button
-            onClick={async () => {
-              if (!report) return;
-              setPdfExporting(true);
-              await new Promise((r) => setTimeout(r, 10));
-              const teamNotes = notesForTeam(teamNumber);
-              await exportScoutReportPDF(report, teamNotes);
-              setPdfExporting(false);
-            }}
-            disabled={pdfExporting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50 border border-zinc-700"
-          >
-            {pdfExporting ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            )}
-            {pdfExporting ? "Generating…" : "Export PDF"}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={async () => {
+                  const text = buildSummary(report);
+                  const ok = await copyToClipboard(text);
+                  if (ok) {
+                    setCopySummaryToast(true);
+                    setTimeout(() => setCopySummaryToast(false), 2000);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors border border-zinc-700"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                </svg>
+                Copy Summary
+              </button>
+              {copySummaryToast && (
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 pointer-events-none z-50">
+                  Copied!
+                </span>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                if (!report) return;
+                setPdfExporting(true);
+                await new Promise((r) => setTimeout(r, 10));
+                const teamNotes = notesForTeam(teamNumber);
+                await exportScoutReportPDF(report, teamNotes);
+                setPdfExporting(false);
+              }}
+              disabled={pdfExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50 border border-zinc-700"
+            >
+              {pdfExporting ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+              )}
+              {pdfExporting ? "Generating…" : "Export PDF"}
+            </button>
+          </div>
         </div>
       </div>
 

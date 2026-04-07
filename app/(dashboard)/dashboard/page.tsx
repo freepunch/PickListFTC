@@ -11,6 +11,7 @@ import { PrescoutRankedTeam } from "@/lib/types";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
 import { findScopedKeys } from "@/lib/storage";
+import { AddToPickListButton } from "@/components/AddToPickListButton";
 
 function SkeletonCard() {
   return (
@@ -192,6 +193,12 @@ function PrescoutDashboard() {
                       </td>
                       <td className="px-5 py-2.5 text-center">
                         <span className={`text-sm ${trend.color}`}>{trend.icon}</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <AddToPickListButton
+                          team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.bestOpr }}
+                          size="xs"
+                        />
                       </td>
                     </tr>
                   );
@@ -717,6 +724,12 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-5 py-2.5 text-right font-mono text-white text-xs">
                             {team.stats.opr.totalPointsNp.toFixed(1)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <AddToPickListButton
+                              team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.stats.opr.totalPointsNp }}
+                              size="xs"
+                            />
                           </td>
                         </tr>
                       ))}
