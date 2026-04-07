@@ -9,7 +9,7 @@ import { Tutorial } from "@/components/Tutorial";
 import { isTutorialComplete, setTutorialComplete, clearTutorialComplete } from "@/lib/storage";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { highContrast, event, loadEvent, setEventCode } = useEvent();
+  const { highContrast, event, eventCode, loadEvent, setEventCode } = useEvent();
   const { user, loading: authLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -26,6 +26,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep ?event= URL param in sync with current event so the address bar is always shareable.
+  // Uses replaceState to avoid polluting browser history.
+  useEffect(() => {
+    if (!eventCode) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("event") === eventCode) return; // already in sync
+    params.set("event", eventCode);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }, [eventCode]);
 
   // Launch tutorial on first event load.
   // Wait for auth to resolve so we don't mistake a loading logged-in user for anonymous.

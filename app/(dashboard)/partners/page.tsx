@@ -684,8 +684,39 @@ function rankPrescoutPartners(
 
 // ── Main Page ──
 
+function PartnersSkeleton() {
+  return (
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+      <div>
+        <div className="skeleton h-7 w-36 mb-2" />
+        <div className="skeleton h-4 w-64" />
+      </div>
+      {/* Team selector skeleton */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+        <div className="skeleton h-10 w-full rounded-lg" />
+      </div>
+      {/* Results table skeleton */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="skeleton h-4 w-32" />
+          <div className="skeleton h-4 w-16" />
+        </div>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-b border-zinc-800/50 last:border-0">
+            <div className="skeleton h-4 w-5 shrink-0" />
+            <div className="skeleton h-4 w-12 shrink-0" />
+            <div className="skeleton h-4 flex-1" />
+            <div className="skeleton h-4 w-16 shrink-0" />
+            <div className="skeleton h-4 w-20 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function PartnersPage() {
-  const { event, teams, isPrescout, prescoutRanking } = useEvent();
+  const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading } = useEvent();
   const [selectedTeam, setSelectedTeam] = useState<ProcessedTeam | null>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [mode, setMode] = useState<PartnerMode>("balanced");
@@ -737,6 +768,8 @@ export default function PartnersPage() {
     params.set("team", String(selectedTeam.teamNumber));
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, [selectedTeam]);
+
+  if (loading) return <PartnersSkeleton />;
 
   if (!event) {
     return (
@@ -888,7 +921,14 @@ export default function PartnersPage() {
           </div>
         )}
 
-        {selectedTeam && ((isPrescout && prescoutRanked.length === 0) || (!isPrescout && ranked.length === 0)) && (
+        {selectedTeam && isPrescout && prescoutLoading && (
+          <div className="text-center py-16">
+            <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-zinc-500">Loading season data…</p>
+          </div>
+        )}
+
+        {selectedTeam && !prescoutLoading && ((isPrescout && prescoutRanked.length === 0) || (!isPrescout && ranked.length === 0)) && (
           <div className="text-center py-16">
             <p className="text-sm text-zinc-500">No other teams at this event to compare against.</p>
           </div>

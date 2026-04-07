@@ -576,6 +576,18 @@ export default function ComparePage() {
     });
   }, [teams, toggleTeamSelection]);
 
+  // Sync filled slots → ?teams= URL param so address bar is shareable
+  useEffect(() => {
+    const filled = slots.filter((s): s is number => s !== null);
+    const params = new URLSearchParams(window.location.search);
+    if (filled.length > 0) {
+      params.set("teams", filled.join(","));
+    } else {
+      params.delete("teams");
+    }
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }, [slots]);
+
   // Escape key clears selections
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
