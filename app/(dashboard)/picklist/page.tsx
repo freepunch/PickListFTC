@@ -100,13 +100,17 @@ export default function PickListPage() {
       .sort((a, b) => b.opr - a.opr);
   }, [event, teams, isPrescout, prescoutRanking]);
 
-  // Load from localStorage + cloud once per event code
+  // Load from localStorage + cloud once per event+user combination.
+  // Using a compound key "eventCode:userId" ensures that signing in while an
+  // event is already cached correctly triggers a cloud fetch for the logged-in
+  // user (guarding on event.code alone would skip it).
   useEffect(() => {
     if (!event || loading) return;
     if (isPrescout && prescoutLoading) return;
-    if (loadedCodeRef.current === event.code) return;
+    const loadKey = `${event.code}:${userId ?? "anon"}`;
+    if (loadedCodeRef.current === loadKey) return;
 
-    loadedCodeRef.current = event.code;
+    loadedCodeRef.current = loadKey;
     const saved = loadLocalPickList(event.code, userId);
 
     const applyData = (data: StoredPickList | null) => {

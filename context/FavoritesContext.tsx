@@ -36,7 +36,7 @@ interface FavoritesContextValue {
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const migrationAccepted = useMigrationAccepted();
   const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>([]);
   const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>([]);
@@ -56,15 +56,20 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavoriteTeams(teams);
   }, [userId]);
 
-  // Migrate unscoped keys on user change, then reload
+  // Migrate unscoped keys on user change, then reload.
+  // Guard on authLoading: if we fire with userId=null while auth is still
+  // resolving, we read from plftc:anon: localStorage (empty on new devices)
+  // and show nothing until auth settles. Waiting for auth to resolve means we
+  // fire exactly once, with the correct userId.
   useEffect(() => {
+    if (authLoading) return;
     loadedRef.current = false;
     setFavoriteEvents([]);
     setFavoriteTeams([]);
     // Migrate any old unscoped keys to user-scoped keys before loading
     migrateUnscopedKeys(userId);
     refreshFavorites().then(() => { loadedRef.current = true; });
-  }, [refreshFavorites, userId]);
+  }, [refreshFavorites, userId, authLoading]);
 
   // Sync state → localStorage on every change (scoped by userId)
   useEffect(() => {

@@ -43,21 +43,27 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const [notes, setNotes] = useState<ScoutNote[]>([]);
   const [sharedNotes, setSharedNotes] = useState<ScoutNote[]>([]);
-  const [loadedCode, setLoadedCode] = useState<string>("");
+  // Track compound "eventCode:userId" so that signing in mid-session
+  // correctly re-runs the load (cloud notes are fetched for the logged-in user).
+  const [loadedKey, setLoadedKey] = useState<string>("");
   const syncingRef = useRef(false);
 
   const userId = user?.id ?? null;
 
-  // Load & merge notes when event code changes
+  // Load & merge notes when event code or auth state changes.
+  // Using a compound key "eventCode:userId" ensures that signing in while
+  // an event is already loaded correctly triggers a cloud sync for the
+  // logged-in user (the old guard `eventCode === loadedCode` would skip it).
   useEffect(() => {
-    if (!eventCode || eventCode === loadedCode) return;
+    const key = eventCode ? `${eventCode}:${userId ?? "anon"}` : "";
+    if (!eventCode || key === loadedKey) return;
 
     const localNotes = loadNotes(eventCode, userId);
 
     if (!userId) {
       setNotes(localNotes);
       setSharedNotes([]);
-      setLoadedCode(eventCode);
+      setLoadedKey(key);
       return;
     }
 
@@ -87,12 +93,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setSharedNotes([]);
     }
 
-    setLoadedCode(eventCode);
-  }, [eventCode, loadedCode, userId, profile?.team_number]);
+    setLoadedKey(key);
+  }, [eventCode, loadedKey, userId, profile?.team_number]);
 
   // Persist to localStorage whenever notes change (only after load)
   useEffect(() => {
-    if (!eventCode || loadedCode !== eventCode || syncingRef.current) return;
+    const key = eventCode ? `${eventCode}:${userId ?? "anon"}` : "";
+    if (!eventCode || loadedKey !== key || syncingRef.current) return;
     saveNotes(eventCode, notes, userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes, userId]);
