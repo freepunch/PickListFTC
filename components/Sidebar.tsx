@@ -764,7 +764,7 @@ function SidebarContent({
         )}
 
         <div className="mt-3">
-          {user ? <UserMenu collapsed={collapsed} /> : <SignInButton collapsed={collapsed} />}
+          <UserMenu collapsed={collapsed} />
         </div>
 
         {!collapsed && (

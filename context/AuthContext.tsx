@@ -10,6 +10,7 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabase";
 import { hasUnscopedData } from "@/lib/storage";
+import { track } from "@vercel/analytics";
 import type { User, Session } from "@supabase/supabase-js";
 
 export interface Profile {
@@ -106,6 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newUser);
       if (newUser) {
         const isNew = _event === "SIGNED_IN";
+        if (isNew) {
+          // Track sign-in for analytics (daily active users, adoption metrics)
+          track("user_signed_in", { userId: newUser.id, email: newUser.email ?? "" });
+        }
         fetchProfile(newUser.id, isNew);
       } else {
         setProfile(null);

@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   if (!code) {
     // No code param — auth failed or URL was malformed. Redirect with error flag.
-    return NextResponse.redirect(`${origin}/season?auth_error=1`);
+    return NextResponse.redirect(`${origin}/?auth_error=1`);
   }
 
   const cookieStore = await cookies();
@@ -33,8 +33,9 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("[auth/callback] exchangeCodeForSession failed:", error.message);
-    return NextResponse.redirect(`${origin}/season?auth_error=1`);
+    return NextResponse.redirect(`${origin}/?auth_error=1`);
   }
 
-  return NextResponse.redirect(`${origin}/season`);
+  // Redirect to dashboard — AppShell will restore any saved deep link from sessionStorage
+  return NextResponse.redirect(`${origin}/dashboard`);
 }

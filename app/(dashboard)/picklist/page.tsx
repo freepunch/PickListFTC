@@ -107,7 +107,7 @@ export default function PickListPage() {
   useEffect(() => {
     if (!event || loading) return;
     if (isPrescout && prescoutLoading) return;
-    const loadKey = `${event.code}:${userId ?? "anon"}`;
+    const loadKey = `${event.code}:${userId ?? ""}`;
     if (loadedCodeRef.current === loadKey) return;
 
     loadedCodeRef.current = loadKey;

@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, FormEvent } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { searchEvents, getEventData } from "@/lib/api";
-import { EventSearchResult } from "@/lib/types";
+import { getEventData } from "@/lib/api";
 import { track } from "@vercel/analytics";
 
 // ── Showcase event for the live preview ─────────────────────────────────────
-// Pick a large completed championship with lots of teams. Change this each
-// season to stay fresh. If the event fails to load the preview hides gracefully.
 const SHOWCASE_EVENT_CODE = "USNCWI";
+
+const SESSION_EXPIRED_KEY = "plftc:sessionExpired";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,7 +36,7 @@ interface PreviewData {
 const HOW_IT_WORKS = [
   {
     q: "How do I get started?",
-    a: "Search for your event by name or code in the box above. Click your event and you're in — no sign-in needed. All features work instantly with data saved to your browser.",
+    a: "Sign in with Google, then search for your event by name or code. All features — live OPR, team scouting, pick lists — are available immediately.",
   },
   {
     q: "What is the Leaderboard?",
@@ -49,7 +48,7 @@ const HOW_IT_WORKS = [
   },
   {
     q: "What does the Pick List do?",
-    a: "The Pick List builder lets you rank teams with drag-and-drop reordering. Mark teams as picked to hide them, attach penalty badges, and compare across events. If you're signed in, your list syncs to the cloud automatically.",
+    a: "The Pick List builder lets you rank teams with drag-and-drop reordering. Mark teams as picked to hide them, attach penalty badges, and compare across events. Your list syncs to the cloud automatically.",
   },
   {
     q: "How do I compare teams head-to-head?",
@@ -61,11 +60,7 @@ const HOW_IT_WORKS = [
   },
   {
     q: "How do Scout Notes work?",
-    a: "On any Team Report page, attach freeform notes and predefined tags (Fast Cycle, Penalty Prone, Consistent, etc.) to any team. Notes are saved locally and, if signed in, synced to your account.",
-  },
-  {
-    q: "Do I need an account?",
-    a: "No — every feature works without an account. Sign in with Google to sync your pick lists, scout notes, and watched events across devices and to share notes with teammates.",
+    a: "On any Team Report page, attach freeform notes and predefined tags (Fast Cycle, Penalty Prone, Consistent, etc.) to any team. Notes are saved to your account and can be shared with teammates.",
   },
 ];
 
@@ -108,18 +103,6 @@ const FEATURES = [
   },
 ];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function isEventCode(text: string): boolean {
-  const trimmed = text.trim();
-  return /^[A-Z0-9]+$/.test(trimmed) && !trimmed.includes(" ");
-}
-
 // ── Showcase Preview ─────────────────────────────────────────────────────────
 
 function PreviewSkeleton() {
@@ -138,7 +121,7 @@ function PreviewSkeleton() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 px-5 py-2.5">
             <div className="skeleton h-3 w-5 shrink-0" />
-            <div className="skeleton h-3 w-12 shrink-0 font-mono" />
+            <div className="skeleton h-3 w-12 shrink-0" />
             <div className="skeleton h-3 flex-1" />
             <div className="skeleton h-3 w-14 shrink-0" />
             <div className="skeleton h-3 w-16 shrink-0" />
@@ -155,14 +138,12 @@ function ShowcasePreview() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Fail-safe: hide the preview after 5 seconds if data hasn't arrived
     timeoutRef.current = setTimeout(() => setFailed(true), 5000);
 
     getEventData(SHOWCASE_EVENT_CODE)
       .then((event) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-        // Only show if there are completed matches (not prescout)
         const playedMatches = event.matches.filter((m) => m.hasBeenPlayed);
         if (playedMatches.length === 0 || !event.teams?.length) {
           setFailed(true);
@@ -183,10 +164,7 @@ function ShowcasePreview() {
           .sort((a, b) => a.rank - b.rank)
           .slice(0, 10);
 
-        if (teams.length === 0) {
-          setFailed(true);
-          return;
-        }
+        if (teams.length === 0) { setFailed(true); return; }
 
         setPreview({
           eventName: event.name,
@@ -203,9 +181,7 @@ function ShowcasePreview() {
         setFailed(true);
       });
 
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
   }, []);
 
   if (failed) return null;
@@ -213,7 +189,6 @@ function ShowcasePreview() {
 
   return (
     <div className="w-full max-w-2xl mx-auto bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-      {/* Header */}
       <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -224,20 +199,12 @@ function ShowcasePreview() {
         </span>
       </div>
 
-      {/* Quick stats row */}
       <div className="px-5 py-2.5 border-b border-zinc-800/60 flex items-center gap-5 text-xs text-zinc-500 flex-wrap">
-        <span>
-          <span className="text-zinc-300 font-mono font-medium">{preview.teamCount}</span> teams
-        </span>
-        <span>
-          <span className="text-zinc-300 font-mono font-medium">{preview.matchCount}</span> matches played
-        </span>
-        <span>
-          Top OPR: <span className="text-[var(--accent)] font-mono font-semibold">{preview.topOpr.toFixed(1)}</span>
-        </span>
+        <span><span className="text-zinc-300 font-mono font-medium">{preview.teamCount}</span> teams</span>
+        <span><span className="text-zinc-300 font-mono font-medium">{preview.matchCount}</span> matches played</span>
+        <span>Top OPR: <span className="text-[var(--accent)] font-mono font-semibold">{preview.topOpr.toFixed(1)}</span></span>
       </div>
 
-      {/* Column headers */}
       <div className="grid grid-cols-[2rem_4rem_1fr_5rem_5rem] gap-x-2 px-5 py-2 border-b border-zinc-800/40 text-[10px] font-medium text-zinc-600 uppercase tracking-wider">
         <span className="text-right">#</span>
         <span>Team</span>
@@ -246,12 +213,11 @@ function ShowcasePreview() {
         <span className="text-right">W-L-T</span>
       </div>
 
-      {/* Top 10 rows */}
       <div className="divide-y divide-zinc-800/30">
         {preview.teams.map((team, i) => (
           <div
             key={team.teamNumber}
-            className={`grid grid-cols-[2rem_4rem_1fr_5rem_5rem] gap-x-2 px-5 py-2 items-center text-sm ${
+            className={`grid grid-cols-[2rem_4rem_1fr_5rem_5rem] gap-x-2 px-5 py-2 items-center ${
               i % 2 === 0 ? "bg-zinc-900" : "bg-zinc-900/60"
             } ${i === 0 ? "bg-[var(--accent)]/5" : ""}`}
           >
@@ -266,203 +232,9 @@ function ShowcasePreview() {
         ))}
       </div>
 
-      {/* Footer note */}
       <div className="px-5 py-2.5 border-t border-zinc-800/60 text-[10px] text-zinc-600 text-center">
         Showing top 10 of {preview.teamCount} teams by OPR &middot; Powered by FTC Scout
       </div>
-    </div>
-  );
-}
-
-// ── Landing Event Search ─────────────────────────────────────────────────────
-// Standalone — doesn't use EventContext. Navigates to /dashboard?event=CODE.
-
-const DEBOUNCE_MS = 280;
-
-function LandingEventSearch() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<EventSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [highlightIdx, setHighlightIdx] = useState(-1);
-  const [loadingCode, setLoadingCode] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Click-outside to close
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const triggerSearch = useCallback((text: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const trimmed = text.trim();
-    if (!trimmed || isEventCode(trimmed.toUpperCase())) {
-      setResults([]);
-      setShowDropdown(false);
-      return;
-    }
-    setSearching(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await searchEvents(trimmed);
-        setResults(res);
-        setHighlightIdx(-1);
-        if (res.length > 0) setShowDropdown(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, DEBOUNCE_MS);
-  }, []);
-
-  const handleChange = (value: string) => {
-    setQuery(value);
-    triggerSearch(value);
-    if (!value.trim()) setShowDropdown(false);
-    if (value.trim()) track("landing_event_search");
-  };
-
-  const selectEvent = useCallback((code: string, name?: string) => {
-    setShowDropdown(false);
-    setLoadingCode(code);
-    setQuery(name ? `${code} — ${name}` : code);
-    track("landing_event_selected", { code });
-    router.push(`/dashboard?event=${code}`);
-  }, [router]);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = query.trim().toUpperCase();
-    if (!trimmed) return;
-    if (isEventCode(trimmed)) {
-      selectEvent(trimmed);
-    } else if (results.length > 0) {
-      const idx = highlightIdx >= 0 ? highlightIdx : 0;
-      selectEvent(results[idx].code, results[idx].name);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || results.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIdx((prev) => (prev + 1) % results.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIdx((prev) => (prev <= 0 ? results.length - 1 : prev - 1));
-    } else if (e.key === "Enter" && highlightIdx >= 0) {
-      e.preventDefault();
-      selectEvent(results[highlightIdx].code, results[highlightIdx].name);
-    } else if (e.key === "Escape") {
-      setShowDropdown(false);
-    }
-  };
-
-  return (
-    <div ref={containerRef} className="w-full max-w-lg relative">
-      <form onSubmit={handleSubmit}>
-        <div className="relative flex items-center">
-          <div className="absolute left-3.5 text-zinc-500 pointer-events-none">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-          </div>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => handleChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
-              if (results.length > 0) setShowDropdown(true);
-            }}
-            placeholder="Search by event name or code (e.g. Texas, USTXCMP)"
-            maxLength={100}
-            autoComplete="off"
-            className="w-full pl-10 pr-32 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white
-              placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent)]
-              focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
-          />
-          <button
-            type="submit"
-            disabled={!query.trim() || !!loadingCode}
-            className="absolute right-2 px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)]
-              text-white text-sm font-medium rounded-lg transition-all active:scale-[0.97]
-              disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            {loadingCode ? (
-              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
-            )}
-            Go
-          </button>
-          {searching && (
-            <div className="absolute right-[5.5rem] top-1/2 -translate-y-1/2">
-              <svg className="w-4 h-4 animate-spin text-zinc-500" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            </div>
-          )}
-        </div>
-      </form>
-
-      {/* Dropdown */}
-      {showDropdown && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto">
-          <p className="px-4 py-2 text-[10px] font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-700">
-            {results.length} event{results.length !== 1 ? "s" : ""} found
-          </p>
-          {results.map((result, idx) => (
-            <button
-              key={result.code}
-              type="button"
-              onClick={() => selectEvent(result.code, result.name)}
-              className={`w-full text-left px-4 py-3 transition-colors border-b border-zinc-700/40 last:border-0 ${
-                highlightIdx === idx ? "bg-zinc-700/70" : "hover:bg-zinc-700/50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white font-medium truncate">{result.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-mono text-xs text-[var(--accent)]">{result.code}</span>
-                    {result.start && (
-                      <span className="text-xs text-zinc-500">{formatDate(result.start)}</span>
-                    )}
-                    {result.location && (
-                      <span className="text-xs text-zinc-500 truncate">
-                        {[result.location.city, result.location.state].filter(Boolean).join(", ")}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {result.type && (
-                  <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 rounded px-1.5 py-0.5 shrink-0 mt-0.5">
-                    {result.type}
-                  </span>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -473,19 +245,40 @@ export default function LandingPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastIsError, setToastIsError] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
-  // If already logged in, redirect straight to dashboard
+  // Check existing session and handle error/expiry flags
   useEffect(() => {
+    // Session expired flag set by AppShell when auth state transitions to signed-out
+    const expired = sessionStorage.getItem(SESSION_EXPIRED_KEY);
+    if (expired) {
+      sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+      setToast("Your session expired. Please sign in again.");
+      setToastIsError(true);
+    }
+
+    // Auth error from OAuth callback (?auth_error=1 in URL)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth_error")) {
+      setToast("Sign in failed — please try again.");
+      setToastIsError(true);
+      window.history.replaceState(null, "", "/");
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        const name =
-          session.user.user_metadata?.full_name ??
-          session.user.user_metadata?.name ??
-          session.user.email?.split("@")[0] ??
-          "you";
-        setToast(`Welcome back, ${name}`);
+        // Already signed in — redirect to dashboard
+        if (!expired && !params.get("auth_error")) {
+          const name =
+            session.user.user_metadata?.full_name ??
+            session.user.user_metadata?.name ??
+            session.user.email?.split("@")[0] ??
+            "you";
+          setToast(`Welcome back, ${name}`);
+          setToastIsError(false);
+        }
         setTimeout(() => router.replace("/dashboard"), 600);
       } else {
         setChecking(false);
@@ -495,7 +288,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
+    const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -509,34 +302,35 @@ export default function LandingPage() {
     if (error) setSigningIn(false);
   };
 
-  // Loading screen while checking auth (prevents flash for returning users)
+  function ToastBanner() {
+    if (!toast) return null;
+    return (
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
+        <div className={`border rounded-xl px-5 py-3 shadow-2xl flex items-center gap-2.5 ${
+          toastIsError
+            ? "bg-red-950/90 border-red-800 text-red-200"
+            : "bg-zinc-800 border-zinc-700 text-zinc-200"
+        }`}>
+          {toastIsError ? (
+            <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span className="text-sm">{toast}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading screen while checking auth
   if (checking) {
     return (
       <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebApplication",
-              name: "PickListFTC",
-              description: "Free scouting dashboard for FIRST Tech Challenge alliance selection",
-              url: "https://picklistftc.com",
-              applicationCategory: "Sports",
-              operatingSystem: "Web",
-            }),
-          }}
-        />
-        {toast && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-5 py-3 shadow-2xl flex items-center gap-2.5">
-              <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm text-zinc-200">{toast}</span>
-            </div>
-          </div>
-        )}
+        <ToastBanner />
         <main className="flex-1 flex flex-col items-center justify-center px-6">
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight">
             <span className="text-white">PickList</span>
@@ -565,32 +359,14 @@ export default function LandingPage() {
         }}
       />
 
-      {/* Nav — branding left, sign-in right (secondary) */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/60">
+      <ToastBanner />
+
+      {/* Nav — branding only */}
+      <nav className="flex items-center px-6 py-4 border-b border-zinc-800/60">
         <span className="text-xl font-extrabold tracking-tight">
           <span className="text-white">PickList</span>
           <span className="text-[var(--accent)]">FTC</span>
         </span>
-        <button
-          onClick={handleSignIn}
-          disabled={signingIn}
-          className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
-        >
-          {signingIn ? (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-          )}
-          {signingIn ? "Signing in…" : "Sign in to save scouting"}
-        </button>
       </nav>
 
       <main className="flex-1 flex flex-col items-center px-6 pt-12 pb-8">
@@ -604,25 +380,39 @@ export default function LandingPage() {
               <span className="text-[var(--accent)]">for FIRST Tech Challenge</span>
             </h1>
             <p className="text-base text-zinc-400 max-w-md mx-auto">
-              Live OPR, team scouting reports, partner finder, and head-to-head comparison — free, no account needed.
+              Live OPR, team scouting reports, partner finder, and head-to-head comparison — all in one place.
             </p>
           </div>
 
           {/* Live preview */}
           <ShowcasePreview />
 
-          {/* Bridge text */}
-          <p className="text-sm text-zinc-500 text-center -mt-3">
-            This is what PickListFTC looks like for your event.{" "}
-            <span className="text-zinc-300">Search for yours below.</span>
-          </p>
-
-          {/* Event search — primary CTA */}
-          <LandingEventSearch />
-
-          <p className="text-xs text-zinc-600 text-center -mt-5">
-            Works without an account &mdash; data saves locally. Sign in to sync across devices.
-          </p>
+          {/* Primary CTA */}
+          <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+            <button
+              onClick={handleSignIn}
+              disabled={signingIn}
+              className="w-full flex items-center justify-center gap-3 py-3.5 px-6 bg-white hover:bg-zinc-100 active:bg-zinc-200 text-zinc-900 font-semibold rounded-xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {signingIn ? (
+                <svg className="w-5 h-5 animate-spin text-zinc-500" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                </svg>
+              )}
+              {signingIn ? "Signing in…" : "Sign in with Google"}
+            </button>
+            <p className="text-xs text-zinc-600 text-center">
+              Free to use. Sign in to get started.
+            </p>
+          </div>
         </div>
 
         {/* Features */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
@@ -8,12 +9,71 @@ import { QuickSwitcher } from "@/components/QuickSwitcher";
 import { Tutorial } from "@/components/Tutorial";
 import { isTutorialComplete, setTutorialComplete, clearTutorialComplete } from "@/lib/storage";
 
+const REDIRECT_KEY = "plftc:redirectAfterAuth";
+const SESSION_EXPIRED_KEY = "plftc:sessionExpired";
+
+function AuthLoadingScreen() {
+  return (
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <h1 className="text-3xl font-extrabold tracking-tight">
+          <span className="text-white">PickList</span>
+          <span className="text-[var(--accent)]">FTC</span>
+        </h1>
+        <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const { highContrast, event, eventCode, loadEvent, setEventCode } = useEvent();
   const { user, loading: authLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const tutorialCheckedRef = useRef(false);
+  const restoredRef = useRef(false);
+  const prevUserRef = useRef<typeof user | undefined>(undefined);
+
+  // ── Auth gate ────────────────────────────────────────────────────────────────
+  // Redirect unauthenticated users to the landing page.
+  // Save the current URL first so we can restore it after sign-in.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      const url = window.location.href;
+      const origin = window.location.origin;
+      // Only save deep links (not root/dashboard — those aren't worth restoring)
+      if (url !== `${origin}/` && url !== `${origin}/dashboard`) {
+        sessionStorage.setItem(REDIRECT_KEY, url);
+      }
+      router.replace("/");
+    }
+  }, [user, authLoading, router]);
+
+  // ── Session expiry detection ─────────────────────────────────────────────────
+  // If the user was previously logged in and now isn't, the session expired.
+  // Flag it so the landing page can show a toast.
+  useEffect(() => {
+    if (authLoading) return;
+    if (prevUserRef.current != null && user === null) {
+      sessionStorage.setItem(SESSION_EXPIRED_KEY, "1");
+    }
+    prevUserRef.current = user;
+  }, [user, authLoading]);
+
+  // ── Redirect-after-auth ───────────────────────────────────────────────────────
+  // After the user signs in, restore their original deep link if one was saved.
+  useEffect(() => {
+    if (!user || authLoading || restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = sessionStorage.getItem(REDIRECT_KEY);
+    if (saved) {
+      sessionStorage.removeItem(REDIRECT_KEY);
+      router.replace(saved);
+    }
+  }, [user, authLoading, router]);
 
   // Auto-load event from ?event= URL param on mount (for pages without EventLoader)
   useEffect(() => {
@@ -28,28 +88,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   // Keep ?event= URL param in sync with current event so the address bar is always shareable.
-  // Uses replaceState to avoid polluting browser history.
   useEffect(() => {
     if (!eventCode) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("event") === eventCode) return; // already in sync
+    if (params.get("event") === eventCode) return;
     params.set("event", eventCode);
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, [eventCode]);
 
   // Launch tutorial on first event load.
-  // Wait for auth to resolve so we don't mistake a loading logged-in user for anonymous.
   useEffect(() => {
-    if (!event || authLoading || tutorialCheckedRef.current) return;
+    if (!event || authLoading || tutorialCheckedRef.current || !user) return;
     tutorialCheckedRef.current = true;
-
-    if (user) {
-      // Logged-in: only show once, persisted in localStorage
-      if (!isTutorialComplete(user.id)) {
-        setShowTutorial(true);
-      }
-    } else {
-      // Not logged in: show every launch
+    if (!isTutorialComplete(user.id)) {
       setShowTutorial(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,8 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Listen for replay-tutorial events dispatched from sidebar
   useEffect(() => {
     function handleReplay() {
-      const userId = user?.id ?? null;
-      clearTutorialComplete(userId);
+      if (user?.id) clearTutorialComplete(user.id);
       setShowTutorial(true);
     }
     window.addEventListener("plftc:startTutorial", handleReplay);
@@ -68,11 +118,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
-    // Only persist completion for logged-in users; anonymous users see it every launch
-    if (user?.id) {
-      setTutorialComplete(user.id);
-    }
+    if (user?.id) setTutorialComplete(user.id);
   };
+
+  // Block rendering until auth is confirmed — prevents flashing the app for signed-out users
+  if (authLoading || !user) {
+    return <AuthLoadingScreen />;
+  }
 
   return (
     <div className={`flex min-h-screen bg-[var(--bg)] ${highContrast ? "high-contrast" : ""}`}>

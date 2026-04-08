@@ -55,17 +55,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // an event is already loaded correctly triggers a cloud sync for the
   // logged-in user (the old guard `eventCode === loadedCode` would skip it).
   useEffect(() => {
-    const key = eventCode ? `${eventCode}:${userId ?? "anon"}` : "";
+    const key = eventCode ? `${eventCode}:${userId ?? ""}` : "";
     if (!eventCode || key === loadedKey) return;
 
-    const localNotes = loadNotes(eventCode, userId);
-
+    // Auth is required — userId should always be set by the time this runs.
     if (!userId) {
-      setNotes(localNotes);
+      setNotes([]);
       setSharedNotes([]);
       setLoadedKey(key);
       return;
     }
+
+    const localNotes = loadNotes(eventCode, userId);
 
     // Merge local + cloud
     syncingRef.current = true;
@@ -98,7 +99,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   // Persist to localStorage whenever notes change (only after load)
   useEffect(() => {
-    const key = eventCode ? `${eventCode}:${userId ?? "anon"}` : "";
+    const key = eventCode ? `${eventCode}:${userId ?? ""}` : "";
     if (!eventCode || loadedKey !== key || syncingRef.current) return;
     saveNotes(eventCode, notes, userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps

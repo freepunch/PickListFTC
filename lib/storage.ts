@@ -4,12 +4,13 @@
  * All user-specific localStorage keys MUST go through this module
  * to prevent data leaking between accounts on the same browser.
  *
- * Pattern: "plftc:{userId}:{key}" for logged-in users
- *          "plftc:anon:{key}" for anonymous users
+ * Pattern: "plftc:{userId}:{key}" — login is required; userId is always set.
  */
 
 function scopedKey(key: string, userId?: string | null): string {
-  const prefix = userId ? `plftc:${userId}` : "plftc:anon";
+  // userId should always be present (login is required). The fallback
+  // "plftc:__loading__" is a safety net that should never be reached in practice.
+  const prefix = userId ? `plftc:${userId}` : "plftc:__loading__";
   return `${prefix}:${key}`;
 }
 
@@ -49,7 +50,7 @@ export function findScopedKeys(
   userId?: string | null
 ): { key: string; eventCode: string }[] {
   if (typeof window === "undefined") return [];
-  const prefix = userId ? `plftc:${userId}:${keyType}:` : `plftc:anon:${keyType}:`;
+  const prefix = userId ? `plftc:${userId}:${keyType}:` : `plftc:__loading__:${keyType}:`;
   const results: { key: string; eventCode: string }[] = [];
 
   for (let i = 0; i < localStorage.length; i++) {
