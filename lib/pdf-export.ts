@@ -140,10 +140,6 @@ export async function exportPickListPDF(
   doc.setTextColor(...C.white);
   doc.text("PickListFTC", MARGIN, 13);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text("Alliance Pick List", MARGIN + doc.getTextWidth("PickListFTC") + 4, 13);
-
   // Filename-safe date on right
   doc.setFontSize(8);
   doc.setTextColor(200, 220, 255);
