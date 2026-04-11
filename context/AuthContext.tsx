@@ -18,6 +18,7 @@ export interface Profile {
   display_name: string | null;
   team_number: number | null;
   created_at: string;
+  welcome_email_sent: boolean;
 }
 
 interface AuthContextValue {
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [migrationAccepted, setMigrationAccepted] = useState(false);
 
   // Fetch or create profile
-  const fetchProfile = useCallback(async (userId: string, isNewUser: boolean) => {
+  const fetchProfile = useCallback(async (userId: string, isNewUser: boolean, userEmail?: string, userName?: string) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -59,10 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error && error.code === "PGRST116") {
-        // Profile doesn't exist — create one
+        // Profile doesn't exist — create one (new user)
         const { data: newProfile, error: insertError } = await supabase
           .from("profiles")
-          .insert({ id: userId })
+          .insert({ id: userId, display_name: userName ?? null })
           .select()
           .single();
 
@@ -70,6 +71,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(newProfile as Profile);
           setShowTeamPrompt(true);
           if (hasLocalData()) setShowMigrationPrompt(true);
+
+          // Fire-and-forget welcome email
+          if (userEmail) {
+            fetch('/api/welcome-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: userEmail, name: userName }),
+            }).then(() => {
+              supabase.from('profiles').update({ welcome_email_sent: true }).eq('id', userId);
+            }).catch(err => console.error('[EMAIL] Failed to send welcome:', err));
+          }
         }
         return;
       }
@@ -94,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[AUTH] getSession:", session?.user?.email ?? "no session");
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id, false);
+        fetchProfile(session.user.id, false, session.user.email, session.user.user_metadata?.full_name);
       }
       setLoading(false);
     });
@@ -111,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Track sign-in for analytics (daily active users, adoption metrics)
           track("user_signed_in", { userId: newUser.id, email: newUser.email ?? "" });
         }
-        fetchProfile(newUser.id, isNew);
+        fetchProfile(newUser.id, isNew, newUser.email, newUser.user_metadata?.full_name);
       } else {
         setProfile(null);
         setShowTeamPrompt(false);
