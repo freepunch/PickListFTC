@@ -146,6 +146,7 @@ export interface EventSearchResult {
   code: string;
   name: string;
   start: string;
+  end?: string;
   type: string;
   location: EventSearchLocation;
 }

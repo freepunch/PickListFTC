@@ -234,6 +234,7 @@ const EVENT_SEARCH_QUERY = `
       code
       name
       start
+      end
       type
       location {
         venue
