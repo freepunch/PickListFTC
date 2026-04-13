@@ -79,3 +79,17 @@ body {
   background-color: #27272a;
   border-radius: 0.5rem;
 }
+
+/* Sidebar event name ticker */
+@keyframes ticker {
+  0%, 15%   { transform: translateX(0); }
+  85%, 100% { transform: translateX(var(--scroll-distance, 0px)); }
+}
+.ticker-text {
+  animation: ticker var(--ticker-duration, 8s) linear infinite;
+  animation-delay: 2s;
+}
+.ticker-text:hover {
+  animation-play-state: paused;
+  cursor: default;
+}

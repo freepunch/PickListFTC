@@ -502,10 +502,41 @@ function SidebarContent({
   const [reportQuery, setReportQuery] = useState("");
   const [, setTick] = useState(0);
   const [isMac, setIsMac] = useState(false);
+  const [tickerScroll, setTickerScroll] = useState(false);
+  const [tickerVars, setTickerVars] = useState({ distance: "0px", duration: "8s" });
+  const tickerTextRef = useRef<HTMLSpanElement>(null);
+  const tickerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMac(navigator.platform.toUpperCase().includes("MAC"));
   }, []);
+
+  // Measure ticker overflow and set up ResizeObserver for sidebar width changes.
+  // The span always has white-space:nowrap via inline style so scrollWidth is the
+  // true text width — not clipped — making the overflow check accurate.
+  useEffect(() => {
+    function measure() {
+      if (!tickerTextRef.current || !tickerContainerRef.current) return;
+      const textWidth = tickerTextRef.current.scrollWidth;
+      const containerWidth = tickerContainerRef.current.clientWidth;
+      const overflow = textWidth - containerWidth;
+      if (overflow > 0) {
+        setTickerScroll(true);
+        setTickerVars({
+          distance: `-${overflow + 16}px`,
+          duration: `${Math.max(5, textWidth / 30).toFixed(1)}s`,
+        });
+      } else {
+        setTickerScroll(false);
+      }
+    }
+    measure();
+    const container = tickerContainerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [event?.name, collapsed]);
 
   const hasEvent = !!event;
 
@@ -727,7 +758,22 @@ function SidebarContent({
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-200 truncate flex-1 mr-2">{event.name}</p>
+                  <div ref={tickerContainerRef} className="overflow-hidden flex-1 mr-2">
+                    <span
+                      ref={tickerTextRef}
+                      className={`text-sm font-medium text-zinc-200${tickerScroll ? " ticker-text" : ""}`}
+                      style={{
+                        display: "inline-block",
+                        whiteSpace: "nowrap",
+                        ...(tickerScroll && {
+                          "--scroll-distance": tickerVars.distance,
+                          "--ticker-duration": tickerVars.duration,
+                        } as React.CSSProperties),
+                      }}
+                    >
+                      {event.name}
+                    </span>
+                  </div>
                   <button
                     onClick={() => toggleEventFav({ event_code: event.code, event_name: event.name, season: event.season, start: event.start })}
                     title={isEventFavorited(event.code) ? "Unwatch event" : "Watch event"}
