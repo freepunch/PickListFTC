@@ -814,22 +814,33 @@ function SidebarContent({
         </div>
 
         {!collapsed && (
-          <div className="flex items-center justify-between mt-3">
-            <p className="text-xs text-zinc-500">
-              Built by{" "}
-              <a href="https://ftrobotics.com" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
-                First Try #21364
-              </a>
-            </p>
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent("plftc:startTutorial"))}
-              title="Replay tutorial"
-              className="text-zinc-600 hover:text-zinc-400 transition-colors p-0.5 rounded"
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500">
+                Built by{" "}
+                <a href="https://ftrobotics.com" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
+                  First Try #21364
+                </a>
+              </p>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("plftc:startTutorial"))}
+                title="Replay tutorial"
+                className="text-zinc-600 hover:text-zinc-400 transition-colors p-0.5 rounded"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+              </button>
+            </div>
+            <a
+              href="/donate"
+              className="flex items-center gap-1.5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors w-fit"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+              <svg className="w-3 h-3 text-rose-400/60" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
               </svg>
-            </button>
+              Support PickListFTC
+            </a>
           </div>
         )}
       </div>
