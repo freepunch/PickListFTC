@@ -71,7 +71,7 @@ export default function DonatePage() {
       <nav className="flex items-center px-6 py-4 border-b border-zinc-800/60">
         <Link href="/" className="text-xl font-extrabold tracking-tight">
           <span className="text-white">Pick</span>
-          <span className="text-[var(--accent)]">list</span>
+          <span className="text-[var(--accent)]">List</span>
           <span className="text-white">FTC</span>
         </Link>
       </nav>

@@ -875,7 +875,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           {!collapsed && (
             <h1 className="text-lg font-bold text-white tracking-tight">
-              Pick<span className="text-[var(--accent)]">list</span>FTC
+              Pick<span className="text-[var(--accent)]">List</span>FTC
             </h1>
           )}
           <button
@@ -896,7 +896,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
         <aside className="fixed inset-y-0 left-0 z-[60] w-72 flex flex-col bg-zinc-900 border-r border-[var(--border)] shadow-2xl md:hidden">
           <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
             <h1 className="text-lg font-bold text-white tracking-tight">
-              Pick<span className="text-[var(--accent)]">list</span>FTC
+              Pick<span className="text-[var(--accent)]">List</span>FTC
             </h1>
             <button onClick={onMobileClose} aria-label="Close menu" className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
