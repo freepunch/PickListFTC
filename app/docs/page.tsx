@@ -182,7 +182,8 @@ export default function DocsPage() {
                   src={`https://www.youtube.com/embed/v-YYb7e474Y?start=${section.start}`}
                   title={section.title}
                   frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                   loading="lazy"
                 />
