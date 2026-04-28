@@ -333,8 +333,9 @@ export default function LandingPage() {
         <ToastBanner />
         <main className="flex-1 flex flex-col items-center justify-center px-6">
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight">
-            <span className="text-white">PickList</span>
-            <span className="text-[var(--accent)]">FTC</span>
+            <span className="text-white">Pick</span>
+            <span className="text-[var(--accent)]">list</span>
+            <span className="text-white">FTC</span>
           </h1>
           <div className="mt-8 w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
         </main>
