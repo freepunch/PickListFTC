@@ -17,8 +17,9 @@ function AuthLoadingScreen() {
     <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <h1 className="text-3xl font-extrabold tracking-tight">
-          <span className="text-white">PickList</span>
-          <span className="text-[var(--accent)]">FTC</span>
+          <span className="text-white">Pick</span>
+          <span className="text-[var(--accent)]">list</span>
+          <span className="text-white">FTC</span>
         </h1>
         <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
       </div>
@@ -131,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile top bar — visible only on <768px */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-4 bg-zinc-900 border-b border-[var(--border)] md:hidden">
         <h1 className="text-lg font-bold text-white tracking-tight">
-          PickList<span className="text-[var(--accent)]">FTC</span>
+          Pick<span className="text-[var(--accent)]">list</span>FTC
         </h1>
         <button
           onClick={() => setMobileMenuOpen(true)}
