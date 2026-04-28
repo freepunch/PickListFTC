@@ -179,7 +179,7 @@ export default function DocsPage() {
                 <iframe
                   width="100%"
                   style={{ aspectRatio: "16/9", maxWidth: "720px", display: "block" }}
-                  src={`https://www.youtube.com/embed/v-YYb7e474Y?start=${section.start}`}
+                  src={`https://www.youtube-nocookie.com/embed/v-YYb7e474Y?start=${section.start}&rel=0`}
                   title={section.title}
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
