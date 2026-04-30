@@ -24,6 +24,7 @@ import {
 } from "@/lib/calculations";
 import { ProcessedTeam, Match, TeamEventStats2025, PrescoutRankedTeam } from "@/lib/types";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const TEAM_COLORS = [
@@ -54,31 +55,17 @@ function TeamSlot({
   prescoutTeam?: PrescoutRankedTeam | null;
 }) {
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const color = TEAM_COLORS[index];
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setFocused(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return allTeams
-      .filter(
-        (t) =>
-          t.teamNumber.toString().includes(q) ||
-          t.teamName.toLowerCase().includes(q)
-      )
-      .slice(0, 8);
-  }, [query, allTeams]);
+  const searchOptions = useMemo<TeamSearchOption[]>(
+    () =>
+      allTeams.map((t) => ({
+        teamNumber: t.teamNumber,
+        teamName: t.teamName,
+        rank: t.stats.rank,
+      })),
+    [allTeams]
+  );
 
   const [noteFormOpen, setNoteFormOpen] = useState(false);
 
@@ -150,45 +137,22 @@ function TeamSlot({
   }
 
   return (
-    <div ref={ref} className="relative">
-      <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+    <TeamSearch
+      teams={searchOptions}
+      inputValue={query}
+      onInputChange={setQuery}
+      onSelect={(opt) => {
+        onSelect(opt.teamNumber);
+        setQuery("");
+      }}
+      placeholder="Search team # or name..."
+      prefix={
         <div className={`w-2.5 h-2.5 rounded-full bg-zinc-700 shrink-0`} />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setFocused(true)}
-          placeholder="Search team # or name..."
-          className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-600
-            focus:outline-none"
-        />
-      </div>
-      {focused && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
-          {results.map((t) => (
-            <button
-              key={t.teamNumber}
-              onClick={() => {
-                onSelect(t.teamNumber);
-                setQuery("");
-                setFocused(false);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-zinc-700/50 transition-colors flex items-center gap-3"
-            >
-              <span className="font-mono text-sm text-white">
-                {t.teamNumber}
-              </span>
-              <span className="text-sm text-zinc-400 truncate">
-                {t.teamName}
-              </span>
-              <span className="text-xs text-zinc-600 ml-auto shrink-0">
-                #{t.stats.rank}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      }
+      showSearchIcon={false}
+      showRank
+      enterToSelect
+    />
   );
 }
 

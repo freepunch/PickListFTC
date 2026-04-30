@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
 import { copyToClipboard } from "@/lib/clipboard";
 
 // ── Radar axes (same as compare view) ──
@@ -80,55 +81,33 @@ function TeamSelector({
   onSelect: (team: ProcessedTeam) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return teams.slice(0, 15);
-    return teams.filter(
-      (t) =>
-        String(t.teamNumber).includes(q) ||
-        t.teamName.toLowerCase().includes(q)
-    ).slice(0, 15);
-  }, [query, teams]);
+  const options = useMemo<TeamSearchOption[]>(
+    () =>
+      teams.map((t) => ({
+        teamNumber: t.teamNumber,
+        teamName: t.teamName,
+        rank: t.stats.rank,
+      })),
+    [teams]
+  );
 
   return (
-    <div data-tutorial="partner-search" className="relative w-full sm:w-72">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Search team # or name..."
-        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
-          placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
-          focus:ring-1 focus:ring-[var(--accent)]/30 font-mono transition-colors"
-      />
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
-          {filtered.map((t) => (
-            <button
-              key={t.teamNumber}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onSelect(t);
-                setQuery("");
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-zinc-700/50 transition-colors"
-            >
-              <span className="font-mono text-sm text-[var(--accent)]">{t.teamNumber}</span>
-              <span className="text-sm text-zinc-300 ml-2">{t.teamName}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <TeamSearch
+      teams={options}
+      inputValue={query}
+      onInputChange={setQuery}
+      onSelect={(opt) => {
+        const found = teams.find((t) => t.teamNumber === opt.teamNumber);
+        if (found) onSelect(found);
+        setQuery("");
+      }}
+      placeholder="Search team # or name..."
+      className="w-full sm:w-72"
+      dataTutorial="partner-search"
+      showRank
+      enterToSelect
+    />
   );
 }
 
