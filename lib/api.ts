@@ -104,19 +104,24 @@ const EVENT_QUERY = `
       }
       matches {
         id
+        matchNum
+        description
         hasBeenPlayed
+        scheduledStartTime
         scores {
           ... on MatchScores2025 {
             red {
               totalPointsNp
               autoPoints
               dcPoints
+              penaltyPointsCommitted
               alliance
             }
             blue {
               totalPointsNp
               autoPoints
               dcPoints
+              penaltyPointsCommitted
               alliance
             }
           }

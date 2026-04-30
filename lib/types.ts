@@ -85,6 +85,7 @@ export interface MatchScores2025Alliance {
   totalPointsNp: number;
   autoPoints: number;
   dcPoints: number;
+  penaltyPointsCommitted?: number;
   alliance: Alliance;
 }
 
@@ -95,7 +96,10 @@ export interface MatchScores2025 {
 
 export interface Match {
   id: number;
+  matchNum?: number;
+  description?: string;
   hasBeenPlayed: boolean;
+  scheduledStartTime?: string | null;
   scores: MatchScores2025 | null;
   teams: MatchTeam[];
 }

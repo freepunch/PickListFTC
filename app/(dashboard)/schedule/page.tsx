@@ -1,70 +1,101 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useEvent } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
 import { EventLoader } from "@/components/EventLoader";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
+import { AddToPickListButton } from "@/components/AddToPickListButton";
 
 // ── Win probability ──
-// Logistic function tuned so a 20-point margin → ~85% win probability.
-
-const WIN_K = 20 / Math.log(0.85 / 0.15); // ≈ 11.53
-
+const WIN_K = 20 / Math.log(0.85 / 0.15);
 function winProb(diff: number): number {
   return 1 / (1 + Math.exp(-diff / WIN_K));
 }
 
-// ── Internal types ──
+const MY_TEAM_KEY = "plftc:scheduleMyTeam";
+
+// ── Types ──
 
 interface ParsedMatch {
   id: number;
+  matchNum: number;
   played: boolean;
   red: [number, number];
   blue: [number, number];
-  // Completed
   redScore: number | null;
   blueScore: number | null;
   autoRed: number | null;
   autoBlue: number | null;
   dcRed: number | null;
   dcBlue: number | null;
-  // Prediction
+  penaltyRed: number | null;
+  penaltyBlue: number | null;
+  redOpr: number;
+  blueOpr: number;
   redPred: number;
   bluePred: number;
-  redWinProb: number; // 0–1
+  redWinProb: number;
 }
 
-type StatusFilter = "all" | "completed" | "upcoming";
+type StatusFilter = "all" | "completed" | "upcoming" | "mine";
 
-// ── Helpers ──
+// ── Small helpers ──
 
-function TeamLink({ num }: { num: number }) {
+function TeamLink({ num, highlight }: { num: number; highlight?: boolean }) {
   if (!num) return <span className="text-zinc-700">—</span>;
   return (
     <Link
       href={`/report/${num}`}
       onClick={(e) => e.stopPropagation()}
-      className="font-mono font-semibold text-white hover:text-[var(--accent)] transition-colors tabular-nums"
+      className={`font-mono tabular-nums hover:text-[var(--accent)] transition-colors ${
+        highlight ? "font-bold text-[var(--accent)]" : "font-semibold text-white"
+      }`}
     >
       {num}
     </Link>
   );
 }
 
-function StatusPill({ played, isNow }: { played: boolean; isNow: boolean }) {
-  if (isNow) {
+function StatusBadge({
+  played,
+  isOnDeck,
+  isInTheHole,
+  pulse,
+}: {
+  played: boolean;
+  isOnDeck: boolean;
+  isInTheHole: boolean;
+  pulse: boolean;
+}) {
+  if (isOnDeck) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        Now
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/40 ${
+          pulse ? "animate-pulse" : ""
+        }`}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+        On Deck
+      </span>
+    );
+  }
+  if (isInTheHole) {
+    return (
+      <span
+        className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wide bg-zinc-800 text-zinc-300 border-zinc-700 ${
+          pulse ? "animate-pulse" : ""
+        }`}
+      >
+        In The Hole
       </span>
     );
   }
   if (played) {
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-500 uppercase tracking-wide">
-        Done
+        Played
       </span>
     );
   }
@@ -75,31 +106,170 @@ function StatusPill({ played, isNow }: { played: boolean; isNow: boolean }) {
   );
 }
 
+function AllianceCell({
+  teams,
+  side,
+  oprSum,
+  brighter,
+  myTeam,
+  isPrescout,
+}: {
+  teams: [number, number];
+  side: "red" | "blue";
+  oprSum: number;
+  brighter: boolean;
+  myTeam: number | null;
+  isPrescout: boolean;
+}) {
+  const tone = side === "red" ? "text-red-300" : "text-blue-300";
+  const muted = side === "red" ? "text-red-400/50" : "text-blue-400/50";
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-3">
+        <TeamLink num={teams[0]} highlight={myTeam === teams[0]} />
+        <TeamLink num={teams[1]} highlight={myTeam === teams[1]} />
+      </div>
+      {!isPrescout && oprSum > 0 && (
+        <span
+          className={`text-[10px] font-mono tabular-nums ${brighter ? tone : muted}`}
+        >
+          {oprSum.toFixed(1)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Score / prediction display ──
+
+function ScoreDisplay({
+  m,
+  myTeam,
+}: {
+  m: ParsedMatch;
+  myTeam: number | null;
+}) {
+  const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
+  const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
+  const myAlliance = myTeam
+    ? m.red.includes(myTeam)
+      ? "red"
+      : m.blue.includes(myTeam)
+        ? "blue"
+        : null
+    : null;
+
+  if (m.played) {
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <span
+          className={`font-mono text-sm font-bold tabular-nums ${
+            redWon ? "text-red-300" : "text-zinc-500"
+          } ${myAlliance === "red" ? "underline decoration-[var(--accent)]/40 underline-offset-2" : ""}`}
+        >
+          {m.redScore?.toFixed(0) ?? "—"}
+        </span>
+        <span className="text-zinc-700 text-xs">–</span>
+        <span
+          className={`font-mono text-sm font-bold tabular-nums ${
+            blueWon ? "text-blue-300" : "text-zinc-500"
+          } ${myAlliance === "blue" ? "underline decoration-[var(--accent)]/40 underline-offset-2" : ""}`}
+        >
+          {m.blueScore?.toFixed(0) ?? "—"}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-end gap-2">
+        <span className="font-mono text-xs text-red-400/60 italic tabular-nums">
+          ~{m.redPred}
+        </span>
+        <span className="text-zinc-700 text-[10px]">–</span>
+        <span className="font-mono text-xs text-blue-400/60 italic tabular-nums">
+          ~{m.bluePred}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden flex w-24 ml-auto">
+        <div
+          className="bg-red-500/60 transition-all"
+          style={{ width: `${m.redWinProb * 100}%` }}
+        />
+        <div
+          className="bg-blue-500/60 transition-all"
+          style={{ width: `${(1 - m.redWinProb) * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Expanded detail: completed match ──
 
-function CompletedDetail({ m }: { m: ParsedMatch }) {
+function CompletedDetail({
+  m,
+  oprMap,
+  predictionCorrect,
+}: {
+  m: ParsedMatch;
+  oprMap: Map<number, number>;
+  predictionCorrect: boolean;
+}) {
   const redWon = (m.redScore ?? 0) > (m.blueScore ?? 0);
   const blueWon = (m.blueScore ?? 0) > (m.redScore ?? 0);
+  const tied = m.played && (m.redScore ?? 0) === (m.blueScore ?? 0);
+
+  function TeamContribution({ num, side }: { num: number; side: "red" | "blue" }) {
+    const opr = oprMap.get(num) ?? 0;
+    const tone = side === "red" ? "text-red-300" : "text-blue-300";
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <Link
+          href={`/report/${num}`}
+          onClick={(e) => e.stopPropagation()}
+          className={`font-mono font-semibold ${tone} hover:underline`}
+        >
+          {num || "—"}
+        </Link>
+        <span className="text-zinc-600">·</span>
+        <span className="text-zinc-500">OPR</span>
+        <span className="font-mono tabular-nums text-zinc-300">
+          {opr.toFixed(1)}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4">
-      <div className="flex-1 overflow-x-auto">
+    <div className="flex flex-col gap-4">
+      {/* Score breakdown table */}
+      <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="text-zinc-600 uppercase tracking-wider border-b border-zinc-800/50">
               <th className="text-left py-1.5 pr-4">Alliance</th>
               <th className="text-right py-1.5 pr-4">Auto</th>
               <th className="text-right py-1.5 pr-4">Driver</th>
+              <th className="text-right py-1.5 pr-4">Pen.</th>
               <th className="text-right py-1.5">Total (NP)</th>
             </tr>
           </thead>
           <tbody>
-            <tr className={`border-b border-zinc-800/30 ${redWon ? "text-white" : "text-zinc-400"}`}>
+            <tr
+              className={`border-b border-zinc-800/30 ${
+                redWon ? "text-white" : "text-zinc-400"
+              }`}
+            >
               <td className="py-1.5 pr-4">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                   Red
-                  {redWon && <span className="text-[10px] text-emerald-400 font-medium">Win</span>}
+                  {redWon && (
+                    <span className="text-[10px] text-emerald-400 font-medium">
+                      Win
+                    </span>
+                  )}
                 </span>
               </td>
               <td className="py-1.5 pr-4 text-right font-mono">
@@ -108,7 +278,14 @@ function CompletedDetail({ m }: { m: ParsedMatch }) {
               <td className="py-1.5 pr-4 text-right font-mono">
                 {m.dcRed?.toFixed(0) ?? "—"}
               </td>
-              <td className={`py-1.5 text-right font-mono font-semibold ${redWon ? "text-emerald-400" : ""}`}>
+              <td className="py-1.5 pr-4 text-right font-mono text-zinc-500">
+                {m.penaltyRed != null ? m.penaltyRed.toFixed(0) : "—"}
+              </td>
+              <td
+                className={`py-1.5 text-right font-mono font-semibold ${
+                  redWon ? "text-emerald-400" : ""
+                }`}
+              >
                 {m.redScore?.toFixed(0) ?? "—"}
               </td>
             </tr>
@@ -117,7 +294,11 @@ function CompletedDetail({ m }: { m: ParsedMatch }) {
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                   Blue
-                  {blueWon && <span className="text-[10px] text-emerald-400 font-medium">Win</span>}
+                  {blueWon && (
+                    <span className="text-[10px] text-emerald-400 font-medium">
+                      Win
+                    </span>
+                  )}
                 </span>
               </td>
               <td className="py-1.5 pr-4 text-right font-mono">
@@ -126,12 +307,70 @@ function CompletedDetail({ m }: { m: ParsedMatch }) {
               <td className="py-1.5 pr-4 text-right font-mono">
                 {m.dcBlue?.toFixed(0) ?? "—"}
               </td>
-              <td className={`py-1.5 text-right font-mono font-semibold ${blueWon ? "text-emerald-400" : ""}`}>
+              <td className="py-1.5 pr-4 text-right font-mono text-zinc-500">
+                {m.penaltyBlue != null ? m.penaltyBlue.toFixed(0) : "—"}
+              </td>
+              <td
+                className={`py-1.5 text-right font-mono font-semibold ${
+                  blueWon ? "text-emerald-400" : ""
+                }`}
+              >
                 {m.blueScore?.toFixed(0) ?? "—"}
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Per-team OPR contribution */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-zinc-800/40">
+        <div>
+          <p className="text-[10px] font-medium text-red-400/70 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            Red contribution
+          </p>
+          <div className="space-y-1">
+            {m.red.map((n) => (
+              <TeamContribution key={n} num={n} side="red" />
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium text-blue-400/70 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            Blue contribution
+          </p>
+          <div className="space-y-1">
+            {m.blue.map((n) => (
+              <TeamContribution key={n} num={n} side="blue" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Prediction accuracy */}
+      <div className="flex items-center justify-between text-xs pt-3 border-t border-zinc-800/40">
+        <span className="text-zinc-500">
+          Predicted: <span className="font-mono">{m.redPred}</span> –{" "}
+          <span className="font-mono">{m.bluePred}</span>
+        </span>
+        {tied ? (
+          <span className="text-zinc-500">Tie</span>
+        ) : predictionCorrect ? (
+          <span className="text-emerald-400 font-medium flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            Prediction correct
+          </span>
+        ) : (
+          <span className="text-amber-400 font-medium flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Upset
+          </span>
+        )}
       </div>
     </div>
   );
@@ -143,24 +382,32 @@ function UpcomingDetail({
   m,
   oprMap,
   devMap,
+  wildcardThreshold,
+  myTeam,
+  teamNameMap,
 }: {
   m: ParsedMatch;
   oprMap: Map<number, number>;
   devMap: Map<number, number>;
+  wildcardThreshold: number;
+  myTeam: number | null;
+  teamNameMap: Map<number, string>;
 }) {
-  const allTeams = [...m.red, ...m.blue];
+  const allTeams = [...m.red, ...m.blue].filter(Boolean);
   const maxOpr = Math.max(...allTeams.map((n) => oprMap.get(n) ?? 0), 1);
+  const myAlliance = myTeam
+    ? m.red.includes(myTeam)
+      ? "red"
+      : m.blue.includes(myTeam)
+        ? "blue"
+        : null
+    : null;
+  const opponents = myAlliance === "red" ? m.blue : myAlliance === "blue" ? m.red : null;
 
-  function TeamRow({
-    num,
-    alliance,
-  }: {
-    num: number;
-    alliance: "red" | "blue";
-  }) {
+  function TeamRow({ num, alliance }: { num: number; alliance: "red" | "blue" }) {
     const opr = oprMap.get(num) ?? 0;
     const dev = devMap.get(num) ?? 0;
-    const isWildcard = dev > 35;
+    const isWildcard = dev >= wildcardThreshold && devMap.size > 0;
     const barPct = (opr / maxOpr) * 100;
 
     return (
@@ -170,14 +417,16 @@ function UpcomingDetail({
           onClick={(e) => e.stopPropagation()}
           className={`font-mono text-sm font-semibold w-14 shrink-0 hover:underline ${
             alliance === "red" ? "text-red-300" : "text-blue-300"
-          }`}
+          } ${myTeam === num ? "ring-1 ring-[var(--accent)] ring-offset-1 ring-offset-zinc-900 rounded px-1" : ""}`}
         >
           {num || "—"}
         </Link>
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-0.5">
-            <span className="text-xs text-zinc-500">OPR</span>
-            <span className="text-xs font-mono text-zinc-300 tabular-nums">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5 gap-2">
+            <span className="text-[10px] text-zinc-500 truncate">
+              {teamNameMap.get(num) || ""}
+            </span>
+            <span className="text-xs font-mono text-zinc-300 tabular-nums shrink-0">
               {opr.toFixed(1)}
             </span>
           </div>
@@ -193,11 +442,12 @@ function UpcomingDetail({
         {isWildcard && (
           <span
             title="High score variance — unpredictable"
-            className="text-amber-500/70 shrink-0"
+            className="text-amber-500/70 shrink-0 inline-flex items-center gap-0.5 text-[10px] font-medium"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
+            Wildcard
           </span>
         )}
       </div>
@@ -205,112 +455,356 @@ function UpcomingDetail({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-6">
-      {/* Red */}
-      <div className="flex-1">
-        <p className="text-[10px] font-medium text-red-400/70 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          Red Alliance
-        </p>
-        {m.red.map((n) => (
-          <TeamRow key={n} num={n} alliance="red" />
-        ))}
-        <div className="mt-2 pt-2 border-t border-zinc-800/50 flex items-center justify-between">
-          <span className="text-xs text-zinc-600">Predicted</span>
-          <span className="text-sm font-mono font-semibold text-red-300">
-            {m.redPred}
-          </span>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="hidden sm:block w-px bg-zinc-800 self-stretch" />
-
-      {/* Blue */}
-      <div className="flex-1">
-        <p className="text-[10px] font-medium text-blue-400/70 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
-          Blue Alliance
-        </p>
-        {m.blue.map((n) => (
-          <TeamRow key={n} num={n} alliance="blue" />
-        ))}
-        <div className="mt-2 pt-2 border-t border-zinc-800/50 flex items-center justify-between">
-          <span className="text-xs text-zinc-600">Predicted</span>
-          <span className="text-sm font-mono font-semibold text-blue-300">
-            {m.bluePred}
-          </span>
-        </div>
-      </div>
-
-      {/* Win probability */}
-      <div className="sm:w-40 shrink-0">
-        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-3">
-          Win Probability
-        </p>
-        <div className="h-2 rounded-full overflow-hidden flex">
-          <div
-            className="bg-red-500/60 transition-all duration-300"
-            style={{ width: `${m.redWinProb * 100}%` }}
-          />
-          <div
-            className="bg-blue-500/60 transition-all duration-300"
-            style={{ width: `${(1 - m.redWinProb) * 100}%` }}
-          />
-        </div>
-        <div className="flex items-center justify-between mt-1.5">
-          <span className="text-xs font-mono text-red-400">
-            {(m.redWinProb * 100).toFixed(0)}%
-          </span>
-          <span className="text-xs font-mono text-blue-400">
-            {((1 - m.redWinProb) * 100).toFixed(0)}%
-          </span>
-        </div>
-        {devMap.size > 0 && (
-          <p className="text-[10px] text-zinc-700 mt-2 flex items-center gap-1">
-            <svg className="w-3 h-3 text-amber-500/50" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Wildcard = high variance
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-6">
+        {/* Red */}
+        <div className="flex-1">
+          <p className="text-[10px] font-medium text-red-400/70 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            Red Alliance
           </p>
+          {m.red.map((n) => (
+            <TeamRow key={n} num={n} alliance="red" />
+          ))}
+          <div className="mt-2 pt-2 border-t border-zinc-800/50 flex items-center justify-between">
+            <span className="text-xs text-zinc-600">Predicted</span>
+            <span className="text-sm font-mono font-semibold text-red-300">
+              {m.redPred}
+            </span>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="hidden sm:block w-px bg-zinc-800 self-stretch" />
+
+        {/* Blue */}
+        <div className="flex-1">
+          <p className="text-[10px] font-medium text-blue-400/70 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            Blue Alliance
+          </p>
+          {m.blue.map((n) => (
+            <TeamRow key={n} num={n} alliance="blue" />
+          ))}
+          <div className="mt-2 pt-2 border-t border-zinc-800/50 flex items-center justify-between">
+            <span className="text-xs text-zinc-600">Predicted</span>
+            <span className="text-sm font-mono font-semibold text-blue-300">
+              {m.bluePred}
+            </span>
+          </div>
+        </div>
+
+        {/* Win probability */}
+        <div className="sm:w-40 shrink-0">
+          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-3">
+            Win Probability
+          </p>
+          <div className="h-2 rounded-full overflow-hidden flex">
+            <div
+              className="bg-red-500/60 transition-all duration-300"
+              style={{ width: `${m.redWinProb * 100}%` }}
+            />
+            <div
+              className="bg-blue-500/60 transition-all duration-300"
+              style={{ width: `${(1 - m.redWinProb) * 100}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-xs font-mono text-red-400">
+              {(m.redWinProb * 100).toFixed(0)}%
+            </span>
+            <span className="text-xs font-mono text-blue-400">
+              {((1 - m.redWinProb) * 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-zinc-800/40">
+        {opponents && opponents.filter(Boolean).length > 0 && (
+          <Link
+            href={`/compare?teams=${opponents.filter(Boolean).join(",")}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-medium hover:bg-[var(--accent)]/25 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5" />
+            </svg>
+            Scout opposing alliance
+          </Link>
+        )}
+        {opponents && opponents.filter(Boolean).map((num) => (
+          <div key={num} onClick={(e) => e.stopPropagation()}>
+            <AddToPickListButtonWithLabel
+              num={num}
+              name={teamNameMap.get(num) || ""}
+              opr={oprMap.get(num) ?? 0}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AddToPickListButtonWithLabel({
+  num,
+  name,
+  opr,
+}: {
+  num: number;
+  name: string;
+  opr: number;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-800 border border-zinc-700 text-xs">
+      <span className="font-mono font-semibold text-zinc-300">{num}</span>
+      <AddToPickListButton
+        team={{ teamNumber: num, teamName: name, opr }}
+        size="xs"
+      />
+    </div>
+  );
+}
+
+// ── Win/Loss tracker ──
+
+interface MyMatchOutcome {
+  matchId: number;
+  matchNum: number;
+  outcome: "win" | "loss" | "tie" | "upcoming";
+  predictionCorrect: boolean | null;
+  myAlliance: "red" | "blue";
+  myScore: number | null;
+  oppScore: number | null;
+}
+
+function buildMyMatchHistory(
+  matches: ParsedMatch[],
+  myTeam: number | null
+): MyMatchOutcome[] {
+  if (!myTeam) return [];
+  return matches
+    .filter((m) => m.red.includes(myTeam) || m.blue.includes(myTeam))
+    .map((m) => {
+      const myAlliance: "red" | "blue" = m.red.includes(myTeam) ? "red" : "blue";
+      if (!m.played || m.redScore == null || m.blueScore == null) {
+        return {
+          matchId: m.id,
+          matchNum: m.matchNum,
+          outcome: "upcoming" as const,
+          predictionCorrect: null,
+          myAlliance,
+          myScore: null,
+          oppScore: null,
+        };
+      }
+      const myScore = myAlliance === "red" ? m.redScore : m.blueScore;
+      const oppScore = myAlliance === "red" ? m.blueScore : m.redScore;
+      const outcome: "win" | "loss" | "tie" =
+        myScore > oppScore ? "win" : myScore < oppScore ? "loss" : "tie";
+      const predictedRedWin = m.redPred > m.bluePred;
+      const actualRedWin = m.redScore > m.blueScore;
+      const predictionCorrect =
+        m.redPred === m.bluePred
+          ? null
+          : m.redScore === m.blueScore
+            ? null
+            : predictedRedWin === actualRedWin;
+      return {
+        matchId: m.id,
+        matchNum: m.matchNum,
+        outcome,
+        predictionCorrect,
+        myAlliance,
+        myScore,
+        oppScore,
+      };
+    });
+}
+
+function RecordTracker({
+  history,
+  isPrescout,
+}: {
+  history: MyMatchOutcome[];
+  isPrescout: boolean;
+}) {
+  const played = history.filter((h) => h.outcome !== "upcoming");
+  if (history.length === 0) return null;
+
+  const w = played.filter((h) => h.outcome === "win").length;
+  const l = played.filter((h) => h.outcome === "loss").length;
+  const t = played.filter((h) => h.outcome === "tie").length;
+  const accChecked = played.filter((h) => h.predictionCorrect !== null);
+  const accCorrect = accChecked.filter((h) => h.predictionCorrect === true).length;
+  const accuracyPct = accChecked.length > 0
+    ? Math.round((accCorrect / accChecked.length) * 100)
+    : null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {played.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          {played.map((h) => {
+            const base = "w-3 h-3 rounded-full shrink-0";
+            let color = "bg-zinc-500";
+            if (h.outcome === "win") color = "bg-emerald-500/80";
+            else if (h.outcome === "loss") color = "bg-red-500/80";
+            return (
+              <span
+                key={h.matchId}
+                className={`${base} ${color}`}
+                title={`Q${h.matchNum} — ${h.outcome.toUpperCase()} ${h.myScore}–${h.oppScore}`}
+              />
+            );
+          })}
+        </div>
+      )}
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+        <span className="text-zinc-300 font-mono font-semibold">
+          {w}-{l}-{t}{" "}
+          <span className="text-zinc-500 font-sans font-normal">
+            after {played.length} match{played.length === 1 ? "" : "es"}
+          </span>
+        </span>
+        {accuracyPct !== null && !isPrescout && (
+          <span className="text-zinc-500">
+            Prediction accuracy:{" "}
+            <span className="text-zinc-300 font-mono">
+              {accCorrect}/{accChecked.length}
+            </span>{" "}
+            <span className="text-zinc-400">({accuracyPct}%)</span>
+          </span>
         )}
       </div>
     </div>
   );
 }
 
-// ── Main Page ──
+// ── Main page ──
 
 export default function SchedulePage() {
   const {
-    event, teams, loading,
-    isPrescout, prescoutRanking, prescoutLoading,
+    event,
+    teams,
+    loading,
+    isPrescout,
+    prescoutRanking,
+    prescoutLoading,
+    prescoutData,
   } = useEvent();
+  const { profile } = useAuth();
 
-  const [teamQuery, setTeamQuery] = useState("");
+  // My team state
+  const [myTeam, setMyTeam] = useState<number | null>(null);
+  const [myTeamInput, setMyTeamInput] = useState<string>("");
+  const myTeamHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (myTeamHydratedRef.current) return;
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem(MY_TEAM_KEY);
+    if (stored) {
+      const n = parseInt(stored, 10);
+      if (!isNaN(n) && n > 0) {
+        setMyTeam(n);
+        setMyTeamInput(String(n));
+        myTeamHydratedRef.current = true;
+        return;
+      }
+    }
+    if (profile?.team_number) {
+      setMyTeam(profile.team_number);
+      setMyTeamInput(String(profile.team_number));
+      myTeamHydratedRef.current = true;
+    }
+  }, [profile?.team_number]);
+
+  function commitMyTeamInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setMyTeam(null);
+      setMyTeamInput("");
+      if (typeof window !== "undefined") localStorage.removeItem(MY_TEAM_KEY);
+      return;
+    }
+    const n = parseInt(trimmed, 10);
+    if (isNaN(n) || n <= 0) return;
+    setMyTeam(n);
+    setMyTeamInput(String(n));
+    if (typeof window !== "undefined") localStorage.setItem(MY_TEAM_KEY, String(n));
+  }
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [filterDefaulted, setFilterDefaulted] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
 
-  // OPR + dev maps
-  const { oprMap, devMap } = useMemo(() => {
+  // Default to "mine" once we have a team and matches
+  useEffect(() => {
+    if (filterDefaulted) return;
+    if (myTeam && event?.matches?.length) {
+      setStatusFilter("mine");
+      setFilterDefaulted(true);
+    }
+  }, [myTeam, event, filterDefaulted]);
+
+  // If myTeam clears while on "mine", switch to "all"
+  useEffect(() => {
+    if (!myTeam && statusFilter === "mine") setStatusFilter("all");
+  }, [myTeam, statusFilter]);
+
+  // OPR + dev + name maps
+  const { oprMap, devMap, teamNameMap } = useMemo(() => {
     const opr = new Map<number, number>();
     const dev = new Map<number, number>();
+    const name = new Map<number, string>();
+
+    if (event) {
+      for (const tep of event.teams) {
+        if (tep.team?.name) name.set(tep.teamNumber, tep.team.name);
+      }
+    }
+
     if (isPrescout) {
       for (const t of prescoutRanking) opr.set(t.teamNumber, t.bestOpr);
+      // Dev from season-best event for each prescout team
+      for (const t of prescoutData) {
+        const best = t.events
+          .filter((e) => e.stats !== null)
+          .map((e) => e.stats?.dev?.totalPointsNp ?? 0)
+          .reduce((max, v) => Math.max(max, v), 0);
+        if (best > 0) dev.set(t.number, best);
+        if (t.name) name.set(t.number, t.name);
+      }
     } else {
       for (const t of teams) {
         opr.set(t.teamNumber, t.stats.opr.totalPointsNp);
         dev.set(t.teamNumber, t.stats.dev.totalPointsNp);
+        name.set(t.teamNumber, t.teamName);
       }
     }
-    return { oprMap: opr, devMap: dev };
-  }, [teams, isPrescout, prescoutRanking]);
+    return { oprMap: opr, devMap: dev, teamNameMap: name };
+  }, [teams, event, isPrescout, prescoutRanking, prescoutData]);
 
-  // Parse + sort matches
+  // Wildcard threshold (top 25% of dev)
+  const wildcardThreshold = useMemo(() => {
+    const devs = Array.from(devMap.values()).filter((d) => d > 0).sort((a, b) => b - a);
+    if (devs.length === 0) return Infinity;
+    const idx = Math.max(0, Math.floor(devs.length * 0.25) - 1);
+    return devs[idx] ?? Infinity;
+  }, [devMap]);
+
+  // Parse matches
   const allMatches = useMemo<ParsedMatch[]>(() => {
-    if (!event) return [];
+    if (!event?.matches) return [];
     return [...event.matches]
-      .sort((a, b) => a.id - b.id)
+      .sort((a, b) => {
+        const an = a.matchNum ?? a.id;
+        const bn = b.matchNum ?? b.id;
+        return an - bn;
+      })
       .map((m) => {
         const red = m.teams
           .filter((t) => t.alliance === "Red")
@@ -331,6 +825,7 @@ export default function SchedulePage() {
 
         return {
           id: m.id,
+          matchNum: m.matchNum ?? m.id,
           played: m.hasBeenPlayed,
           red: [r1, r2],
           blue: [b1, b2],
@@ -340,6 +835,10 @@ export default function SchedulePage() {
           autoBlue: m.scores?.blue.autoPoints ?? null,
           dcRed: m.scores?.red.dcPoints ?? null,
           dcBlue: m.scores?.blue.dcPoints ?? null,
+          penaltyRed: m.scores?.red.penaltyPointsCommitted ?? null,
+          penaltyBlue: m.scores?.blue.penaltyPointsCommitted ?? null,
+          redOpr,
+          blueOpr,
           redPred: Math.round(redOpr),
           bluePred: Math.round(blueOpr),
           redWinProb: winProb(redOpr - blueOpr),
@@ -347,23 +846,33 @@ export default function SchedulePage() {
       });
   }, [event, oprMap]);
 
-  // "Now" = first unplayed match when at least one has been played
-  const nowId = useMemo(() => {
-    if (!allMatches.some((m) => m.played)) return null;
-    return allMatches.find((m) => !m.played)?.id ?? null;
+  // On Deck = first unplayed; In The Hole = second unplayed
+  const { onDeckId, inTheHoleId } = useMemo(() => {
+    let onDeck: number | null = null;
+    let inTheHole: number | null = null;
+    for (const m of allMatches) {
+      if (!m.played) {
+        if (onDeck === null) onDeck = m.id;
+        else if (inTheHole === null) {
+          inTheHole = m.id;
+          break;
+        }
+      }
+    }
+    return { onDeckId: onDeck, inTheHoleId: inTheHole };
   }, [allMatches]);
 
-  // Team highlight
-  const highlightTeam = useMemo(() => {
-    const n = parseInt(teamQuery.trim(), 10);
-    return isNaN(n) || n <= 0 ? null : n;
-  }, [teamQuery]);
+  // My match history
+  const myMatchHistory = useMemo(
+    () => buildMyMatchHistory(allMatches, myTeam),
+    [allMatches, myTeam]
+  );
 
-  // Team summary card
-  const teamSummary = useMemo(() => {
-    if (!highlightTeam) return null;
+  // My team summary
+  const myTeamSummary = useMemo(() => {
+    if (!myTeam) return null;
     const involved = allMatches.filter(
-      (m) => m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
+      (m) => m.red.includes(myTeam) || m.blue.includes(myTeam)
     );
     const played = involved.filter((m) => m.played);
     const upcoming = involved.filter((m) => !m.played);
@@ -371,7 +880,7 @@ export default function SchedulePage() {
     let w = 0, l = 0, t = 0;
     for (const m of played) {
       if (m.redScore === null || m.blueScore === null) continue;
-      const isRed = m.red.includes(highlightTeam);
+      const isRed = m.red.includes(myTeam);
       const mine = isRed ? m.redScore : m.blueScore;
       const opp = isRed ? m.blueScore : m.redScore;
       if (mine > opp) w++;
@@ -379,28 +888,85 @@ export default function SchedulePage() {
       else t++;
     }
 
-    const next = upcoming[0];
-    let nextDesc = "";
+    const next = upcoming[0] ?? null;
+    let nextInfo: {
+      matchNum: number;
+      alliance: "red" | "blue";
+      partner: number;
+      opponents: [number, number];
+      redPred: number;
+      bluePred: number;
+      myWinProb: number;
+    } | null = null;
     if (next) {
-      const isRed = next.red.includes(highlightTeam);
-      const partner = (isRed ? next.red : next.blue).find((n) => n !== highlightTeam);
-      const opponents = isRed ? next.blue : next.red;
-      nextDesc = `Match ${next.id} · partner ${partner ?? "?"} vs ${opponents.filter(Boolean).join(" & ")}`;
+      const isRed = next.red.includes(myTeam);
+      const partner = (isRed ? next.red : next.blue).find((n) => n !== myTeam) ?? 0;
+      const oppList = (isRed ? next.blue : next.red) as [number, number];
+      nextInfo = {
+        matchNum: next.matchNum,
+        alliance: isRed ? "red" : "blue",
+        partner,
+        opponents: oppList,
+        redPred: next.redPred,
+        bluePred: next.bluePred,
+        myWinProb: isRed ? next.redWinProb : 1 - next.redWinProb,
+      };
     }
 
-    return { played: played.length, upcoming: upcoming.length, w, l, t, next: nextDesc };
-  }, [highlightTeam, allMatches]);
+    const teamName =
+      teamNameMap.get(myTeam) ||
+      (event?.teams.find((tep) => tep.teamNumber === myTeam)?.team.name ?? "");
+
+    return {
+      teamName,
+      played: played.length,
+      upcoming: upcoming.length,
+      involvedCount: involved.length,
+      w, l, t,
+      nextInfo,
+      isInEvent: involved.length > 0,
+    };
+  }, [myTeam, allMatches, teamNameMap, event]);
 
   // Filtered list
   const visible = useMemo(() => {
     if (statusFilter === "completed") return allMatches.filter((m) => m.played);
     if (statusFilter === "upcoming") return allMatches.filter((m) => !m.played);
+    if (statusFilter === "mine" && myTeam) {
+      return allMatches.filter(
+        (m) => m.red.includes(myTeam) || m.blue.includes(myTeam)
+      );
+    }
     return allMatches;
-  }, [allMatches, statusFilter]);
+  }, [allMatches, statusFilter, myTeam]);
+
+  // Auto-scroll target: first unplayed match in the visible list (event On Deck if visible)
+  const scrollTargetId = useMemo(() => {
+    if (!visible.length) return null;
+    if (onDeckId !== null && visible.some((m) => m.id === onDeckId)) return onDeckId;
+    return visible.find((m) => !m.played)?.id ?? null;
+  }, [visible, onDeckId]);
+
+  const scrolledRef = useRef(false);
+  const scrollTargetDesktopRef = useRef<HTMLTableRowElement | null>(null);
+  const scrollTargetMobileRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (scrolledRef.current) return;
+    if (!scrollTargetId) return;
+    const id = window.requestAnimationFrame(() => {
+      const target = scrollTargetDesktopRef.current ?? scrollTargetMobileRef.current;
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrolledRef.current = true;
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [scrollTargetId]);
 
   const isLoading = loading || (isPrescout && prescoutLoading);
 
-  // ── Empty states ──
+  // ── Empty / loading ──
 
   if (isLoading) {
     return (
@@ -414,7 +980,11 @@ export default function SchedulePage() {
     );
   }
 
-  // ── Main render ──
+  const hasNoSchedule = !!event && (!event.matches || event.matches.length === 0);
+  const allMatchesComplete =
+    allMatches.length > 0 && allMatches.every((m) => m.played);
+
+  // ── Render ──
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -437,28 +1007,35 @@ export default function SchedulePage() {
 
         {event && (
           <>
-            {/* Search + filter bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              {/* Team search */}
-              <div className="relative w-full sm:w-56">
+            {/* My Team input */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="relative w-full sm:w-72">
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={teamQuery}
-                  onChange={(e) => setTeamQuery(e.target.value)}
-                  placeholder="Highlight team #…"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-8 py-2.5 text-sm text-white
-                    placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors"
+                  value={myTeamInput}
+                  onChange={(e) => setMyTeamInput(e.target.value.replace(/\D/g, ""))}
+                  onBlur={(e) => commitMyTeamInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      commitMyTeamInput((e.target as HTMLInputElement).value);
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  placeholder="My team #…"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-9 py-2.5 text-sm text-white
+                    placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]/40 transition-colors"
                 />
-                {teamQuery && (
+                {myTeamInput && (
                   <button
-                    onClick={() => setTeamQuery("")}
+                    onClick={() => commitMyTeamInput("")}
+                    aria-label="Clear team"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -470,22 +1047,29 @@ export default function SchedulePage() {
 
               {/* Status filter */}
               <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-0.5">
-                {(["all", "completed", "upcoming"] as StatusFilter[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setStatusFilter(f)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg capitalize transition-all ${
-                      statusFilter === f
-                        ? "bg-zinc-800 text-white shadow-sm"
-                        : "text-zinc-500 hover:text-zinc-300"
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
+                {(["all", "completed", "upcoming", "mine"] as StatusFilter[]).map((f) => {
+                  const disabled = f === "mine" && !myTeam;
+                  const label =
+                    f === "mine" ? "My Matches" : f.charAt(0).toUpperCase() + f.slice(1);
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => !disabled && setStatusFilter(f)}
+                      disabled={disabled}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                        statusFilter === f
+                          ? "bg-zinc-800 text-white shadow-sm"
+                          : disabled
+                            ? "text-zinc-700 cursor-not-allowed"
+                            : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Match count */}
               <p className="text-xs text-zinc-600 sm:ml-auto">
                 {visible.length} match{visible.length !== 1 ? "es" : ""}
                 {allMatches.some((m) => m.played) && (
@@ -496,121 +1080,297 @@ export default function SchedulePage() {
               </p>
             </div>
 
-            {/* Team summary card */}
-            {teamSummary && highlightTeam && (
+            {/* My Team summary card */}
+            {myTeam && myTeamSummary && (
               <div className="bg-zinc-900 border border-[var(--accent)]/30 rounded-xl px-5 py-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      Team{" "}
-                      <Link
-                        href={`/report/${highlightTeam}`}
-                        className="font-mono text-[var(--accent)] hover:underline"
-                      >
-                        {highlightTeam}
-                      </Link>
-                    </p>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {teamSummary.played} played, {teamSummary.upcoming} remaining
-                    </p>
-                  </div>
-                  <div className="sm:border-l sm:border-zinc-800 sm:pl-4">
-                    <p className="text-xs text-zinc-500 mb-0.5">Record</p>
-                    <p className="font-mono text-sm font-semibold text-white">
-                      {teamSummary.w}-{teamSummary.l}-{teamSummary.t}
-                    </p>
-                  </div>
-                  {teamSummary.next && (
-                    <div className="sm:border-l sm:border-zinc-800 sm:pl-4 flex-1">
-                      <p className="text-xs text-zinc-500 mb-0.5">Next</p>
-                      <p className="text-xs text-zinc-300">{teamSummary.next}</p>
+                {!myTeamSummary.isInEvent ? (
+                  <p className="text-sm text-zinc-400">
+                    Team{" "}
+                    <span className="font-mono font-semibold text-white">
+                      {myTeam}
+                    </span>{" "}
+                    is not in this event&apos;s match schedule.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
+                      <p className="text-sm font-semibold text-white">
+                        Team{" "}
+                        <Link
+                          href={`/report/${myTeam}`}
+                          className="font-mono text-[var(--accent)] hover:underline"
+                        >
+                          {myTeam}
+                        </Link>
+                        {myTeamSummary.teamName && (
+                          <span className="text-zinc-400 font-normal ml-1.5">
+                            — {myTeamSummary.teamName}
+                          </span>
+                        )}
+                      </p>
+                      {isPrescout && allMatches.length > 0 && (
+                        <span className="text-[10px] uppercase tracking-wider font-medium text-amber-400/80">
+                          Prescout — all scores are predictions based on season OPR
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {!teamSummary.next && (
-                    <div className="sm:border-l sm:border-zinc-800 sm:pl-4">
-                      <p className="text-xs text-zinc-600">No remaining matches</p>
-                    </div>
-                  )}
-                </div>
+
+                    {allMatchesComplete ? (
+                      <p className="text-sm text-zinc-300">
+                        All matches complete. Final record:{" "}
+                        <span className="font-mono font-semibold text-white">
+                          {myTeamSummary.w}-{myTeamSummary.l}-{myTeamSummary.t}
+                        </span>
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">
+                            Record
+                          </p>
+                          <p className="font-mono text-base font-semibold text-white">
+                            {myTeamSummary.w}-{myTeamSummary.l}-{myTeamSummary.t}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {myTeamSummary.played} played · {myTeamSummary.upcoming} remaining
+                          </p>
+                        </div>
+                        {myTeamSummary.nextInfo && (
+                          <>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">
+                                Next match
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-white">
+                                  Q{myTeamSummary.nextInfo.matchNum}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                    myTeamSummary.nextInfo.alliance === "red"
+                                      ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                                      : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                                  }`}
+                                >
+                                  {myTeamSummary.nextInfo.alliance}
+                                </span>
+                              </div>
+                              <p className="text-xs text-zinc-500 mt-0.5">
+                                Partner{" "}
+                                <Link
+                                  href={`/report/${myTeamSummary.nextInfo.partner}`}
+                                  className="font-mono text-zinc-300 hover:underline"
+                                >
+                                  {myTeamSummary.nextInfo.partner || "?"}
+                                </Link>{" "}
+                                vs{" "}
+                                {myTeamSummary.nextInfo.opponents
+                                  .filter(Boolean)
+                                  .map((n, i, arr) => (
+                                    <Fragment key={n}>
+                                      <Link
+                                        href={`/report/${n}`}
+                                        className="font-mono text-zinc-300 hover:underline"
+                                      >
+                                        {n}
+                                      </Link>
+                                      {i < arr.length - 1 && " & "}
+                                    </Fragment>
+                                  ))}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">
+                                Predicted
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`font-mono text-base font-semibold ${
+                                    myTeamSummary.nextInfo.alliance === "red"
+                                      ? "text-red-300"
+                                      : "text-zinc-400"
+                                  }`}
+                                >
+                                  {myTeamSummary.nextInfo.redPred}
+                                </span>
+                                <span className="text-zinc-700 text-xs">–</span>
+                                <span
+                                  className={`font-mono text-base font-semibold ${
+                                    myTeamSummary.nextInfo.alliance === "blue"
+                                      ? "text-blue-300"
+                                      : "text-zinc-400"
+                                  }`}
+                                >
+                                  {myTeamSummary.nextInfo.bluePred}
+                                </span>
+                              </div>
+                              <p className="text-xs text-zinc-500 mt-0.5">
+                                <span
+                                  className={
+                                    myTeamSummary.nextInfo.myWinProb >= 0.5
+                                      ? "text-emerald-400"
+                                      : "text-amber-400"
+                                  }
+                                >
+                                  {(myTeamSummary.nextInfo.myWinProb * 100).toFixed(0)}%
+                                </span>{" "}
+                                to win
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Win/Loss tracker */}
+                    {myMatchHistory.length > 0 && (
+                      <div className="pt-3 border-t border-zinc-800/40">
+                        <RecordTracker history={myMatchHistory} isPrescout={isPrescout} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* No schedule yet */}
+            {hasNoSchedule && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl py-12 text-center text-sm text-zinc-500 px-6">
+                Match schedule will be available once the event publishes its schedule.
               </div>
             )}
 
             {/* Match table */}
-            {visible.length === 0 ? (
+            {!hasNoSchedule && visible.length === 0 && (
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl py-12 text-center text-sm text-zinc-500">
                 No matches to display
               </div>
-            ) : (
+            )}
+
+            {!hasNoSchedule && visible.length > 0 && (
               <>
-                {/* ── Desktop table (sm+) ── */}
+                {/* Desktop table */}
                 <div data-tutorial="match-table" className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[580px]">
+                    <table className="w-full text-sm min-w-[720px]">
                       <thead>
                         <tr className="border-b border-zinc-800 text-xs text-zinc-500 uppercase tracking-wider">
-                          <th className="text-left px-4 py-3 w-20">Match</th>
-                          <th className="text-center px-3 py-3 bg-red-500/5">Red 1</th>
-                          <th className="text-center px-3 py-3 bg-red-500/5">Red 2</th>
-                          <th className="text-center px-3 py-3 bg-blue-500/5">Blue 1</th>
-                          <th className="text-center px-3 py-3 bg-blue-500/5">Blue 2</th>
-                          <th className="text-right px-4 py-3">Score / Prediction</th>
+                          <th className="text-left px-4 py-3 w-24">Match</th>
+                          <th className="text-center px-3 py-3 bg-red-500/10">Red Alliance</th>
+                          <th className="text-center px-3 py-3 bg-blue-500/10">Blue Alliance</th>
+                          <th className="text-right px-4 py-3 w-44">Score / Prediction</th>
+                          <th className="text-right px-4 py-3 w-28">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visible.map((m) => {
-                          const isNow = m.id === nowId;
+                          const isOnDeck = m.id === onDeckId;
+                          const isInTheHole = m.id === inTheHoleId;
                           const isExpanded = expandedMatch === m.id;
-                          const highlighted = !!(highlightTeam && (
-                            m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
-                          ));
-                          const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
-                          const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
-                          const rowBg = isNow
-                            ? "bg-amber-500/5 border-l-2 border-l-amber-500/50"
-                            : highlighted ? "bg-[var(--accent)]/5" : "";
+                          const myInMatch = !!(
+                            myTeam &&
+                            (m.red.includes(myTeam) || m.blue.includes(myTeam))
+                          );
+                          const dimmed = !!myTeam && !myInMatch;
+                          const redBrighter = m.redOpr >= m.blueOpr;
+                          const blueBrighter = m.blueOpr >= m.redOpr;
+                          const predRedWin = m.redPred > m.bluePred;
+                          const actualRedWin = (m.redScore ?? 0) > (m.blueScore ?? 0);
+                          const predictionCorrect =
+                            m.played && m.redScore !== m.blueScore && m.redPred !== m.bluePred
+                              ? predRedWin === actualRedWin
+                              : false;
+
+                          let rowAccent = "";
+                          if (isOnDeck) {
+                            rowAccent = "bg-[var(--accent)]/10 border-l-2 border-l-[var(--accent)]";
+                          } else if (isInTheHole) {
+                            rowAccent = "bg-zinc-800/30 border-l-2 border-l-zinc-600";
+                          } else if (myInMatch) {
+                            rowAccent = "border-l-2 border-l-[var(--accent)]/60";
+                          }
 
                           return (
                             <Fragment key={m.id}>
                               <tr
+                                ref={m.id === scrollTargetId ? scrollTargetDesktopRef : undefined}
                                 onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
-                                className={`border-b border-zinc-800/50 last:border-0 cursor-pointer hover:bg-zinc-800/50 transition-colors ${rowBg}`}
+                                className={`border-b border-zinc-800/50 last:border-0 cursor-pointer hover:bg-zinc-800/40 transition-colors ${rowAccent} ${
+                                  dimmed ? "opacity-60" : ""
+                                } ${isOnDeck ? "h-16" : ""}`}
                               >
                                 <td className="px-4 py-3">
-                                  <div className="flex flex-col gap-1">
-                                    <span className="font-mono text-sm font-semibold text-zinc-200 tabular-nums">Q{m.id}</span>
-                                    <StatusPill played={m.played} isNow={isNow} />
-                                  </div>
+                                  <span
+                                    className={`font-mono text-sm font-semibold tabular-nums ${
+                                      dimmed ? "text-zinc-600" : "text-zinc-200"
+                                    }`}
+                                  >
+                                    Q{m.matchNum}
+                                  </span>
                                 </td>
-                                <td className="px-3 py-3 text-center bg-red-500/5"><TeamLink num={m.red[0]} /></td>
-                                <td className="px-3 py-3 text-center bg-red-500/5"><TeamLink num={m.red[1]} /></td>
-                                <td className="px-3 py-3 text-center bg-blue-500/5"><TeamLink num={m.blue[0]} /></td>
-                                <td className="px-3 py-3 text-center bg-blue-500/5"><TeamLink num={m.blue[1]} /></td>
+                                <td className="px-3 py-3 bg-red-500/10">
+                                  <AllianceCell
+                                    teams={m.red}
+                                    side="red"
+                                    oprSum={m.redOpr}
+                                    brighter={redBrighter}
+                                    myTeam={myTeam}
+                                    isPrescout={isPrescout}
+                                  />
+                                </td>
+                                <td className="px-3 py-3 bg-blue-500/10">
+                                  <AllianceCell
+                                    teams={m.blue}
+                                    side="blue"
+                                    oprSum={m.blueOpr}
+                                    brighter={blueBrighter}
+                                    myTeam={myTeam}
+                                    isPrescout={isPrescout}
+                                  />
+                                </td>
                                 <td className="px-4 py-3 text-right">
-                                  {m.played ? (
-                                    <div className="flex items-center justify-end gap-2">
-                                      <span className={`font-mono text-sm font-bold tabular-nums ${redWon ? "text-red-300" : "text-zinc-400"}`}>{m.redScore?.toFixed(0) ?? "—"}</span>
-                                      <span className="text-zinc-700 text-xs">–</span>
-                                      <span className={`font-mono text-sm font-bold tabular-nums ${blueWon ? "text-blue-300" : "text-zinc-400"}`}>{m.blueScore?.toFixed(0) ?? "—"}</span>
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-1.5">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <span className="font-mono text-xs text-red-400/60 italic tabular-nums">~{m.redPred}</span>
-                                        <span className="text-zinc-700 text-[10px]">–</span>
-                                        <span className="font-mono text-xs text-blue-400/60 italic tabular-nums">~{m.bluePred}</span>
-                                      </div>
-                                      <div className="h-1.5 rounded-full overflow-hidden flex w-24 ml-auto">
-                                        <div className="bg-red-500/50 transition-all" style={{ width: `${m.redWinProb * 100}%` }} />
-                                        <div className="bg-blue-500/50 transition-all" style={{ width: `${(1 - m.redWinProb) * 100}%` }} />
-                                      </div>
-                                    </div>
-                                  )}
+                                  <ScoreDisplay m={m} myTeam={myTeam} />
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="inline-flex flex-col items-end gap-0.5">
+                                    <StatusBadge
+                                      played={m.played}
+                                      isOnDeck={isOnDeck}
+                                      isInTheHole={isInTheHole}
+                                      pulse={(isOnDeck || isInTheHole) && myInMatch}
+                                    />
+                                    {m.played && m.redPred !== m.bluePred && m.redScore !== m.blueScore && (
+                                      <span
+                                        className={`text-[10px] font-mono ${
+                                          predictionCorrect ? "text-emerald-500/70" : "text-amber-500/70"
+                                        }`}
+                                        title={predictionCorrect ? "Prediction correct" : "Upset"}
+                                      >
+                                        {predictionCorrect ? "✓" : "✗"}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                               {isExpanded && (
                                 <tr className="bg-zinc-800/20 border-b border-zinc-800/50">
-                                  <td colSpan={6} className="px-5 py-4">
-                                    {m.played ? <CompletedDetail m={m} /> : <UpcomingDetail m={m} oprMap={oprMap} devMap={devMap} />}
+                                  <td colSpan={5} className="px-5 py-4">
+                                    {m.played ? (
+                                      <CompletedDetail
+                                        m={m}
+                                        oprMap={oprMap}
+                                        predictionCorrect={predictionCorrect}
+                                      />
+                                    ) : (
+                                      <UpcomingDetail
+                                        m={m}
+                                        oprMap={oprMap}
+                                        devMap={devMap}
+                                        wildcardThreshold={wildcardThreshold}
+                                        myTeam={myTeam}
+                                        teamNameMap={teamNameMap}
+                                      />
+                                    )}
                                   </td>
                                 </tr>
                               )}
@@ -622,80 +1382,129 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
-                {/* ── Mobile card list (<sm) ── */}
+                {/* Mobile card list */}
                 <div data-tutorial="match-table" className="sm:hidden space-y-2">
                   {visible.map((m) => {
-                    const isNow = m.id === nowId;
+                    const isOnDeck = m.id === onDeckId;
+                    const isInTheHole = m.id === inTheHoleId;
                     const isExpanded = expandedMatch === m.id;
-                    const highlighted = !!(highlightTeam && (
-                      m.red.includes(highlightTeam) || m.blue.includes(highlightTeam)
-                    ));
-                    const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
-                    const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
+                    const myInMatch = !!(
+                      myTeam &&
+                      (m.red.includes(myTeam) || m.blue.includes(myTeam))
+                    );
+                    const dimmed = !!myTeam && !myInMatch;
+                    const redBrighter = m.redOpr >= m.blueOpr;
+                    const blueBrighter = m.blueOpr >= m.redOpr;
+                    const predRedWin = m.redPred > m.bluePred;
+                    const actualRedWin = (m.redScore ?? 0) > (m.blueScore ?? 0);
+                    const predictionCorrect =
+                      m.played && m.redScore !== m.blueScore && m.redPred !== m.bluePred
+                        ? predRedWin === actualRedWin
+                        : false;
+
+                    let cardClasses =
+                      "bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 cursor-pointer transition-colors hover:bg-zinc-800/40";
+                    if (isOnDeck) {
+                      cardClasses =
+                        "bg-zinc-900 border-2 border-[var(--accent)]/60 rounded-xl px-4 py-4 cursor-pointer";
+                    } else if (isInTheHole) {
+                      cardClasses =
+                        "bg-zinc-900 border border-zinc-600 rounded-xl px-4 py-3 cursor-pointer";
+                    } else if (myInMatch) {
+                      cardClasses =
+                        "bg-zinc-900 border border-zinc-800 border-l-2 border-l-[var(--accent)]/60 rounded-xl px-4 py-3 cursor-pointer hover:bg-zinc-800/40";
+                    } else if (dimmed) {
+                      cardClasses += " opacity-60";
+                    }
 
                     return (
                       <Fragment key={m.id}>
                         <div
+                          ref={m.id === scrollTargetId ? scrollTargetMobileRef : undefined}
                           onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
-                          className={`bg-zinc-900 border rounded-xl px-4 py-3 cursor-pointer transition-colors ${
-                            isNow
-                              ? "border-amber-500/40 bg-amber-500/5"
-                              : highlighted
-                                ? "border-[var(--accent)]/30 bg-[var(--accent)]/5"
-                                : "border-zinc-800 hover:bg-zinc-800/50"
-                          }`}
+                          className={cardClasses}
                         >
-                          {/* Header row */}
                           <div className="flex items-center justify-between mb-2.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-bold text-zinc-200 tabular-nums">Q{m.id}</span>
-                              <StatusPill played={m.played} isNow={isNow} />
+                              <span className="font-mono text-sm font-bold text-zinc-200 tabular-nums">
+                                Q{m.matchNum}
+                              </span>
+                              <StatusBadge
+                                played={m.played}
+                                isOnDeck={isOnDeck}
+                                isInTheHole={isInTheHole}
+                                pulse={(isOnDeck || isInTheHole) && myInMatch}
+                              />
+                              {m.played && m.redPred !== m.bluePred && m.redScore !== m.blueScore && (
+                                <span
+                                  className={`text-[10px] font-mono ${
+                                    predictionCorrect ? "text-emerald-500/70" : "text-amber-500/70"
+                                  }`}
+                                >
+                                  {predictionCorrect ? "✓" : "✗"}
+                                </span>
+                              )}
                             </div>
-                            {/* Score / prediction */}
-                            {m.played ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className={`font-mono text-sm font-bold tabular-nums ${redWon ? "text-red-300" : "text-zinc-400"}`}>{m.redScore?.toFixed(0) ?? "—"}</span>
-                                <span className="text-zinc-600 text-xs">–</span>
-                                <span className={`font-mono text-sm font-bold tabular-nums ${blueWon ? "text-blue-300" : "text-zinc-400"}`}>{m.blueScore?.toFixed(0) ?? "—"}</span>
-                              </div>
-                            ) : (
-                              <span className="font-mono text-xs text-zinc-500 italic">~{m.redPred} – ~{m.bluePred}</span>
-                            )}
+                            <ScoreDisplay m={m} myTeam={myTeam} />
                           </div>
 
                           {/* Alliances */}
                           <div className="space-y-1.5">
-                            <div className="flex items-center gap-2 bg-red-500/5 rounded-lg px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 bg-red-500/10 rounded-lg px-2.5 py-1.5">
                               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                              <span className="text-xs text-zinc-500 w-7 shrink-0">Red</span>
-                              <div className="flex gap-3">
-                                <TeamLink num={m.red[0]} />
-                                <TeamLink num={m.red[1]} />
+                              <span className="text-xs text-zinc-500 w-10 shrink-0">Red</span>
+                              <div className="flex gap-3 flex-1">
+                                <TeamLink num={m.red[0]} highlight={myTeam === m.red[0]} />
+                                <TeamLink num={m.red[1]} highlight={myTeam === m.red[1]} />
                               </div>
+                              {!isPrescout && m.redOpr > 0 && (
+                                <span
+                                  className={`text-[10px] font-mono tabular-nums ${
+                                    redBrighter ? "text-red-300" : "text-red-400/50"
+                                  }`}
+                                >
+                                  {m.redOpr.toFixed(1)}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 bg-blue-500/5 rounded-lg px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-2.5 py-1.5">
                               <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                              <span className="text-xs text-zinc-500 w-7 shrink-0">Blue</span>
-                              <div className="flex gap-3">
-                                <TeamLink num={m.blue[0]} />
-                                <TeamLink num={m.blue[1]} />
+                              <span className="text-xs text-zinc-500 w-10 shrink-0">Blue</span>
+                              <div className="flex gap-3 flex-1">
+                                <TeamLink num={m.blue[0]} highlight={myTeam === m.blue[0]} />
+                                <TeamLink num={m.blue[1]} highlight={myTeam === m.blue[1]} />
                               </div>
+                              {!isPrescout && m.blueOpr > 0 && (
+                                <span
+                                  className={`text-[10px] font-mono tabular-nums ${
+                                    blueBrighter ? "text-blue-300" : "text-blue-400/50"
+                                  }`}
+                                >
+                                  {m.blueOpr.toFixed(1)}
+                                </span>
+                              )}
                             </div>
                           </div>
-
-                          {/* Prediction bar for upcoming */}
-                          {!m.played && (
-                            <div className="mt-2.5 h-1.5 rounded-full overflow-hidden flex">
-                              <div className="bg-red-500/50" style={{ width: `${m.redWinProb * 100}%` }} />
-                              <div className="bg-blue-500/50" style={{ width: `${(1 - m.redWinProb) * 100}%` }} />
-                            </div>
-                          )}
                         </div>
 
-                        {/* Expanded detail */}
                         {isExpanded && (
                           <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-4">
-                            {m.played ? <CompletedDetail m={m} /> : <UpcomingDetail m={m} oprMap={oprMap} devMap={devMap} />}
+                            {m.played ? (
+                              <CompletedDetail
+                                m={m}
+                                oprMap={oprMap}
+                                predictionCorrect={predictionCorrect}
+                              />
+                            ) : (
+                              <UpcomingDetail
+                                m={m}
+                                oprMap={oprMap}
+                                devMap={devMap}
+                                wildcardThreshold={wildcardThreshold}
+                                myTeam={myTeam}
+                                teamNameMap={teamNameMap}
+                              />
+                            )}
                           </div>
                         )}
                       </Fragment>
