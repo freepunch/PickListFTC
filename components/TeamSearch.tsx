@@ -167,7 +167,7 @@ export function TeamSearch({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelect(t)}
-              className="w-full text-left px-3 py-2 hover:bg-zinc-700/50 transition-colors flex items-center gap-3"
+              className="w-full text-left px-3 py-3 min-h-[44px] hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3"
             >
               <span className="font-mono text-sm font-semibold text-white shrink-0">
                 {t.teamNumber}

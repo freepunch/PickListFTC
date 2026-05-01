@@ -34,6 +34,8 @@ interface ColDef {
   getValue: (t: ProcessedTeam) => string | number;
   getRaw: (t: ProcessedTeam) => number | string;
   tooltip?: string;
+  /** Hide this column on mobile (<768px) to reduce horizontal density. */
+  hideOnMobile?: boolean;
 }
 
 function penaltyColor(avg: number): string {
@@ -92,6 +94,7 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
         align: "right",
         getValue: (t) => t.stats.avg.totalPointsNp.toFixed(1),
         getRaw: (t) => t.stats.avg.totalPointsNp,
+        hideOnMobile: true,
       },
       {
         key: "penalties",
@@ -100,6 +103,7 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
         tooltip: "Avg penalty points committed per match. Hover cell for major/minor breakdown.",
         getValue: (t) => (t.stats.avg.penaltyPointsCommitted ?? 0).toFixed(1),
         getRaw: (t) => t.stats.avg.penaltyPointsCommitted ?? 0,
+        hideOnMobile: true,
       },
     ],
   },
@@ -274,6 +278,7 @@ interface PrescoutColDef {
   tooltip?: string;
   getValue: (t: PrescoutRankedTeam) => string | number;
   getRaw: (t: PrescoutRankedTeam) => number | string;
+  hideOnMobile?: boolean;
 }
 
 const PS_SHARED_LEFT: PrescoutColDef[] = [
@@ -646,7 +651,7 @@ export default function LeaderboardPage() {
             </div>
             <h2 className="text-xl font-semibold text-zinc-200 mb-2">Leaderboard</h2>
             <p className="text-sm text-zinc-500">Load an event to see team rankings</p>
-            <p className="text-xs text-zinc-600 mt-3">
+            <p className="hidden md:block text-xs text-zinc-600 mt-3">
               Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">1</kbd>-<kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">4</kbd> to switch tabs
             </p>
           </div>
@@ -655,7 +660,7 @@ export default function LeaderboardPage() {
         {event && !loading && !(isPrescout && prescoutLoading) && (
           <div className="space-y-4">
             {/* Tab bar */}
-            <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+            <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto scrollbar-hide">
               {tabDefs.map((tab, i) => (
                 <button
                   key={tab.id}
@@ -781,20 +786,21 @@ export default function LeaderboardPage() {
 
             {/* Table */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-800">
-                      {!isPrescout && <th className="w-20 px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
+                      {!isPrescout && <th className="w-20 px-2 sm:px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
                       {displayColumns.map((col) => {
                         const isSorted = sortKey === col.key;
                         const isSticky = col.key === "teamNumber" && !isPrescout;
+                        const hideCls = col.hideOnMobile ? "hidden sm:table-cell" : "";
                         return (
                           <th
                             key={col.key}
                             onClick={() => handleSort(col.key)}
                             title={col.tooltip}
-                            className={`px-3 py-3 text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors whitespace-nowrap ${
+                            className={`px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors whitespace-nowrap ${
                               col.align === "right" ? "text-right" : "text-left"
                             } ${
                               isSorted
@@ -802,7 +808,7 @@ export default function LeaderboardPage() {
                                 : "text-zinc-500 hover:text-zinc-300"
                             } ${
                               isSticky ? "sticky left-10 bg-zinc-900 z-20" : ""
-                            }`}
+                            } ${hideCls}`}
                           >
                             <span className="inline-flex items-center gap-1">
                               {col.label}
@@ -845,10 +851,11 @@ export default function LeaderboardPage() {
                                 };
                                 const val = col.getValue(team);
                                 const isTrend = col.key === "trend";
+                                const hideCls = col.hideOnMobile ? "hidden sm:table-cell" : "";
                                 return (
                                   <td
                                     key={col.key}
-                                    className={`px-3 py-2.5 whitespace-nowrap ${
+                                    className={`px-2 sm:px-3 py-2.5 whitespace-nowrap ${hideCls} ${
                                       col.align === "right" ? "text-right" : "text-left"
                                     } ${isSorted ? "bg-[var(--accent)]/5" : ""} ${
                                       col.key === "teamNumber" ? "font-mono text-white font-medium" : ""
@@ -925,7 +932,7 @@ export default function LeaderboardPage() {
                                     : "bg-zinc-900/60"
                               } hover:bg-zinc-800/70`}
                             >
-                              <td className="px-3 py-2.5 sticky left-0 bg-zinc-900 z-10">
+                              <td className="px-2 sm:px-3 py-2.5 sticky left-0 bg-zinc-900 z-10">
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={(e) => {
@@ -933,7 +940,7 @@ export default function LeaderboardPage() {
                                       toggleTeamSelection(team.teamNumber);
                                     }}
                                     title={isSelected ? "Remove from compare" : "Add to compare"}
-                                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-all duration-150 text-xs ${
+                                    className={`w-9 h-9 sm:w-6 sm:h-6 rounded-md flex items-center justify-center transition-all duration-150 text-xs ${
                                       isSelected
                                         ? "bg-[var(--accent)] text-white"
                                         : "bg-zinc-800 border border-zinc-700 text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
@@ -953,7 +960,7 @@ export default function LeaderboardPage() {
                                     href={`/report/${team.teamNumber}`}
                                     onClick={(e) => e.stopPropagation()}
                                     title="Team Report"
-                                    className="w-6 h-6 rounded-md flex items-center justify-center bg-zinc-800 border border-zinc-700
+                                    className="w-9 h-9 sm:w-6 sm:h-6 rounded-md flex items-center justify-center bg-zinc-800 border border-zinc-700
                                       text-zinc-500 hover:border-zinc-600 hover:text-zinc-300 transition-all duration-150"
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -966,7 +973,7 @@ export default function LeaderboardPage() {
                                       toggleTeamFav({ team_number: team.teamNumber, team_name: team.teamName, notes: null });
                                     }}
                                     title={isTeamFavorited(team.teamNumber) ? "Remove from watched" : "Add to watched"}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all duration-150"
+                                    className="w-9 h-9 sm:w-6 sm:h-6 rounded-md flex items-center justify-center transition-all duration-150"
                                   >
                                     <svg
                                       className={`w-3.5 h-3.5 ${
@@ -991,10 +998,11 @@ export default function LeaderboardPage() {
                               {columns.map((col) => {
                                 const isSorted = sortKey === col.key;
                                 const isSticky = col.key === "teamNumber";
+                                const hideCls = col.hideOnMobile ? "hidden sm:table-cell" : "";
                                 return (
                                   <td
                                     key={col.key}
-                                    className={`px-3 py-2.5 whitespace-nowrap ${
+                                    className={`px-2 sm:px-3 py-2.5 whitespace-nowrap ${hideCls} ${
                                       col.align === "right"
                                         ? "text-right"
                                         : "text-left"

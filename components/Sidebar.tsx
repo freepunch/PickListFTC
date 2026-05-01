@@ -390,6 +390,17 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
   const { loadEvent, setEventCode, event: activeEvent } = useEvent();
   const [expanded, setExpanded] = useState(true);
 
+  function handleSelect(eventCode: string, eventName: string | null) {
+    setEventCode(eventCode);
+    loadEvent(eventCode);
+    window.dispatchEvent(
+      new CustomEvent("plftc:eventLoading", {
+        detail: { code: eventCode, name: eventName ?? eventCode },
+      })
+    );
+    onSelectEvent?.();
+  }
+
   if (favoriteEvents.length === 0 || collapsed) return null;
 
   return (
@@ -411,25 +422,29 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
             const isActive = activeEvent?.code === ev.event_code;
 
             return (
-              <div
+              <button
+                type="button"
                 key={ev.event_code}
-                className={`group flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
-                  isActive ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                onClick={() => handleSelect(ev.event_code, ev.event_name ?? null)}
+                className={`group w-full flex items-center gap-2 px-2 py-2 min-h-[44px] rounded-md text-xs transition-colors text-left ${
+                  isActive ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 active:bg-zinc-800"
                 }`}
-                onClick={() => { setEventCode(ev.event_code); loadEvent(ev.event_code); onSelectEvent?.(); }}
               >
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
                 <span className="flex-1 truncate min-w-0">{ev.event_name ?? ev.event_code}</span>
-                <button
+                <span
+                  role="button"
+                  tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); toggleEventFav(ev); }}
-                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all shrink-0 p-0.5"
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); toggleEventFav(ev); } }}
+                  className="md:opacity-0 md:group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all shrink-0 p-1"
                   title="Unwatch event"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </button>
-              </div>
+                </span>
+              </button>
             );
           })}
         </div>
@@ -607,6 +622,131 @@ function SidebarContent({
       )}
     </div>
   );
+
+  // ── Mobile flat-list nav ────────────────────────────────────────────────────
+  // Replace nested nav groups with a single tappable list. Each row is at least
+  // 48px tall, with a clear icon + label.
+  if (isMobile) {
+    const allItems: { href: string; label: string; icon: React.ReactNode; needsEvent: boolean; section?: string }[] = [
+      { href: "/dashboard", label: "Dashboard", icon: DASHBOARD_ITEM.icon, needsEvent: false },
+      ...SCOUT_NAV.filter((it) => !it.isReport).map((it) => ({
+        href: it.href, label: it.label, icon: it.icon, needsEvent: true,
+      })),
+      ...PLAN_NAV.map((it) => ({
+        href: it.href, label: it.label, icon: it.icon, needsEvent: true,
+      })),
+      // Team Report — special: opens a number prompt instead of a route
+      { href: "/report", label: "Team Report", icon: SCOUT_NAV.find((it) => it.isReport)!.icon, needsEvent: true, section: "report" },
+      ...SEASON_NAV.map((it, i) => ({
+        href: it.href, label: it.label, icon: it.icon, needsEvent: false,
+        section: i === 0 ? "season-divider" : undefined,
+      })),
+    ];
+
+    return (
+      <>
+        <nav data-tutorial="sidebar-nav" className="flex-1 px-3 py-2 overflow-y-auto">
+          {/* Search Events — replaces ⌘K hint on mobile */}
+          <button
+            type="button"
+            onClick={() => {
+              onNavClick?.();
+              window.dispatchEvent(new CustomEvent("plftc:openQuickSwitcher"));
+            }}
+            className="w-full flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 active:bg-zinc-700 mb-3"
+          >
+            <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <span className="text-sm font-medium">Search Events</span>
+          </button>
+
+          {allItems.map((it, idx) => {
+            const isActive =
+              it.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(it.href);
+            const disabled = it.needsEvent && !hasEvent;
+            const showDivider = it.section === "season-divider";
+
+            // Special: Team Report opens a numeric prompt
+            if (it.section === "report") {
+              return (
+                <button
+                  key={`${it.href}-${idx}`}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    const num = window.prompt("Enter team number:");
+                    const parsed = parseInt(num ?? "", 10);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      router.push(`/report/${parsed}`);
+                      onNavClick?.();
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-lg text-sm font-medium transition-colors text-left ${
+                    isActive
+                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                      : disabled
+                        ? "text-zinc-700 cursor-not-allowed"
+                        : "text-zinc-300 active:bg-zinc-800 hover:bg-zinc-800"
+                  }`}
+                >
+                  <span className="shrink-0">{it.icon}</span>
+                  <span>{it.label}</span>
+                </button>
+              );
+            }
+
+            const linkCls = `w-full flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                : disabled
+                  ? "text-zinc-700 cursor-not-allowed"
+                  : "text-zinc-300 active:bg-zinc-800 hover:bg-zinc-800"
+            }`;
+
+            return (
+              <div key={`${it.href}-${idx}`}>
+                {showDivider && <div className="my-2 border-t border-zinc-800" />}
+                {disabled ? (
+                  <div className={linkCls} aria-disabled="true">
+                    <span className="shrink-0">{it.icon}</span>
+                    <span>{it.label}</span>
+                  </div>
+                ) : (
+                  <Link href={it.href} onClick={onNavClick} className={linkCls}>
+                    <span className="shrink-0">{it.icon}</span>
+                    <span>{it.label}</span>
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* My Events panel */}
+        <MyEventsPanel collapsed={false} onSelectEvent={onNavClick} />
+
+        {/* Footer — event info + user */}
+        <div data-tutorial="sidebar-footer" className="p-3 border-t border-[var(--border)]">
+          {event && (
+            <div className="mb-3">
+              <p className="text-sm font-medium text-zinc-200 truncate">{event.name}</p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {teams.length} teams
+                {lastUpdated && <span> · {formatTimeAgo(lastUpdated)}</span>}
+              </p>
+            </div>
+          )}
+          <UserMenu collapsed={false} />
+        </div>
+
+        {showTeamPrompt && <TeamPromptModal />}
+        {showMigrationPrompt && !showTeamPrompt && <MigrationPromptModal />}
+      </>
+    );
+  }
 
   return (
     <>

@@ -22,7 +22,7 @@ export function QuickSwitcher() {
   const { loadEvent, setEventCode } = useEvent();
   const { favoriteEvents } = useFavorites();
 
-  // Cmd+K / Ctrl+K to open
+  // Cmd+K / Ctrl+K to open, plus an "open" custom event so other UI (mobile menu) can trigger it
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -30,8 +30,15 @@ export function QuickSwitcher() {
         setOpen((o) => !o);
       }
     }
+    function handleOpenEvent() {
+      setOpen(true);
+    }
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    window.addEventListener("plftc:openQuickSwitcher", handleOpenEvent);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      window.removeEventListener("plftc:openQuickSwitcher", handleOpenEvent);
+    };
   }, []);
 
   // Focus input when opened
@@ -145,7 +152,7 @@ export function QuickSwitcher() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4"
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[8vh] sm:pt-[15vh] px-4"
       onClick={() => setOpen(false)}
     >
       {/* Backdrop */}
@@ -153,7 +160,7 @@ export function QuickSwitcher() {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg max-h-[80vh] flex flex-col bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
@@ -191,7 +198,7 @@ export function QuickSwitcher() {
                     key={ev.event_code}
                     data-idx={idx}
                     onClick={() => selectItem(ev.event_code)}
-                    className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
+                    className={`w-full text-left px-4 py-3 min-h-[48px] flex items-center gap-3 transition-colors ${
                       selectedIdx === idx ? "bg-zinc-800" : "hover:bg-zinc-800/50"
                     }`}
                   >
@@ -223,7 +230,7 @@ export function QuickSwitcher() {
                     key={r.code}
                     data-idx={idx}
                     onClick={() => selectItem(r.code)}
-                    className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
+                    className={`w-full text-left px-4 py-3 min-h-[48px] flex items-center gap-3 transition-colors ${
                       selectedIdx === idx ? "bg-zinc-800" : "hover:bg-zinc-800/50"
                     }`}
                   >
@@ -267,8 +274,8 @@ export function QuickSwitcher() {
           )}
         </div>
 
-        {/* Footer hint */}
-        <div className="px-4 py-2 border-t border-zinc-800 flex items-center gap-3 text-[10px] text-zinc-600">
+        {/* Footer hint — desktop only */}
+        <div className="hidden md:flex px-4 py-2 border-t border-zinc-800 items-center gap-3 text-[10px] text-zinc-600">
           <span><kbd className="bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 font-mono">↑↓</kbd> navigate</span>
           <span><kbd className="bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 font-mono">↵</kbd> select</span>
           <span><kbd className="bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 font-mono">esc</kbd> close</span>

@@ -17,6 +17,7 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const teamNotes = notesForTeam(teamNumber);
@@ -28,9 +29,13 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!open && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      const left = Math.min(rect.left, window.innerWidth - 296);
-      setPos({ top: rect.bottom + 6, left });
+      const mobile = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+      setIsMobile(mobile);
+      if (!mobile) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const left = Math.min(rect.left, window.innerWidth - 296);
+        setPos({ top: rect.bottom + 6, left });
+      }
     }
     setOpen((o) => !o);
   };
@@ -78,12 +83,29 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
       {open &&
         typeof document !== "undefined" &&
         createPortal(
-          <div
-            ref={popoverRef}
-            style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 9999 }}
-            className="w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <>
+            {/* Mobile-only backdrop for bottom-sheet variant */}
+            {isMobile && (
+              <div
+                className="fixed inset-0 bg-black/60 z-[9998] md:hidden"
+                onClick={() => setOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+            <div
+              ref={popoverRef}
+              style={
+                isMobile
+                  ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999 }
+                  : { position: "fixed", top: pos.top, left: pos.left, zIndex: 9999 }
+              }
+              className={
+                isMobile
+                  ? "w-full bg-zinc-900 border-t border-zinc-700 rounded-t-2xl shadow-2xl overflow-hidden animate-slide-up pb-safe"
+                  : "w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
+              }
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
               <span className="text-xs font-medium text-zinc-300">
                 Scout Notes
@@ -209,7 +231,8 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
                 </>
               )}
             </div>
-          </div>,
+          </div>
+          </>,
           document.body
         )}
     </>

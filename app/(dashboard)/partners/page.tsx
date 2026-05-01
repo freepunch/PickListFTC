@@ -807,7 +807,7 @@ export default function PartnersPage() {
 
         {/* Mode selector */}
         {selectedTeam && (
-          <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg overflow-x-auto w-full sm:w-fit" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg overflow-x-auto scrollbar-hide w-full sm:w-fit">
             {(isPrescout ? PRESCOUT_MODES : MODES).map((m) => (
               <button
                 key={m.key}
@@ -831,7 +831,7 @@ export default function PartnersPage() {
         {/* Partner list (live) */}
         {selectedTeam && !isPrescout && ranked.length > 0 && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
+            <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>
               <span className="text-xs font-medium text-zinc-500">Team</span>
               <span className="text-xs font-medium text-zinc-500">{activeMode.scoreHeader}</span>
@@ -878,7 +878,7 @@ export default function PartnersPage() {
         {/* Partner list (prescout) */}
         {selectedTeam && isPrescout && prescoutRanked.length > 0 && selectedPrescout && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
+            <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>
               <span className="text-xs font-medium text-zinc-500">Team</span>
               <span className="text-xs font-medium text-zinc-500">{activeMode.scoreHeader}</span>

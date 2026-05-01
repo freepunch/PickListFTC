@@ -824,6 +824,10 @@ export default function PickListPage() {
                       onRemove={() => removeEntry(entry.teamNumber)}
                       onTogglePicked={() => togglePicked(entry.teamNumber)}
                       onUpdateNotes={(notes) => updateNotes(entry.teamNumber, notes)}
+                      canMoveUp={actualIndex > 0}
+                      canMoveDown={actualIndex < entries.length - 1}
+                      onMoveUp={() => moveEntry(actualIndex, actualIndex - 1)}
+                      onMoveDown={() => moveEntry(actualIndex, actualIndex + 1)}
                     />
                   );
                 })}
@@ -859,6 +863,10 @@ export default function PickListPage() {
                           onUpdateNotes={(notes) =>
                             updateNotes(entry.teamNumber, notes)
                           }
+                          canMoveUp={actualIndex > 0}
+                          canMoveDown={actualIndex < entries.length - 1}
+                          onMoveUp={() => moveEntry(actualIndex, actualIndex - 1)}
+                          onMoveDown={() => moveEntry(actualIndex, actualIndex + 1)}
                         />
                       );
                     })}
@@ -924,6 +932,11 @@ interface PickListRowProps {
   onRemove: () => void;
   onTogglePicked: () => void;
   onUpdateNotes: (notes: string) => void;
+  /** Touch-fallback reorder controls (mobile). */
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 function PickListRow({
@@ -939,22 +952,55 @@ function PickListRow({
   onRemove,
   onTogglePicked,
   onUpdateNotes,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
 }: PickListRowProps) {
   return (
+    <div
+      className={`group select-none border-b border-zinc-800/40 last:border-b-0 transition-colors border-t-2 ${
+        isDragOver ? "border-t-[var(--accent)]" : "border-t-transparent"
+      } ${entry.picked ? "opacity-60" : ""}`}
+    >
     <div
       draggable
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`flex items-center gap-2 px-3 py-2 group select-none hover:bg-zinc-900/60 border-b border-zinc-800/40 last:border-b-0 transition-colors border-t-2 ${
-        isDragOver ? "border-t-[var(--accent)]" : "border-t-transparent"
-      } ${entry.picked ? "opacity-60" : ""}`}
+      className="flex items-center gap-2 px-3 py-2 hover:bg-zinc-900/60"
     >
-      {/* Drag handle */}
-      <span className="text-zinc-700 group-hover:text-zinc-500 shrink-0 cursor-grab active:cursor-grabbing">
+      {/* Drag handle (desktop only — HTML5 drag is not fired by touch) */}
+      <span className="hidden md:inline text-zinc-700 group-hover:text-zinc-500 shrink-0 cursor-grab active:cursor-grabbing">
         <GripIcon />
       </span>
+
+      {/* Up/down reorder buttons (mobile fallback) */}
+      <div className="md:hidden flex flex-col items-center justify-center shrink-0 -my-1">
+        <button
+          type="button"
+          onClick={onMoveUp}
+          disabled={!canMoveUp}
+          aria-label="Move up"
+          className="w-8 h-7 flex items-center justify-center rounded text-zinc-400 disabled:text-zinc-700 active:bg-zinc-800"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={onMoveDown}
+          disabled={!canMoveDown}
+          aria-label="Move down"
+          className="w-8 h-7 flex items-center justify-center rounded text-zinc-400 disabled:text-zinc-700 active:bg-zinc-800"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      </div>
 
       {/* Status dot */}
       <div
@@ -991,7 +1037,7 @@ function PickListRow({
         {entry.opr.toFixed(1)}
       </span>
 
-      {/* Notes input */}
+      {/* Notes input — visible on desktop in-row; mobile shows a compact edit icon below */}
       <input
         type="text"
         value={entry.notes}
@@ -999,7 +1045,7 @@ function PickListRow({
         placeholder="notes…"
         onClick={(e) => e.stopPropagation()}
         onDragStart={(e) => e.stopPropagation()}
-        className="w-36 bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 shrink-0"
+        className="hidden sm:block w-36 bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 shrink-0"
       />
 
       {/* Picked button */}
@@ -1010,7 +1056,7 @@ function PickListRow({
             ? "Mark as available"
             : "Mark as picked by another alliance"
         }
-        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors shrink-0 ${
+        className={`px-3 py-1.5 sm:py-0.5 rounded text-xs font-medium transition-colors shrink-0 min-h-[32px] sm:min-h-0 ${
           entry.picked
             ? "bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25"
             : "bg-zinc-800 text-zinc-500 hover:text-yellow-400 hover:bg-yellow-500/10 border border-zinc-700"
@@ -1019,11 +1065,11 @@ function PickListRow({
         {entry.picked ? "Taken" : "Picked"}
       </button>
 
-      {/* Remove button */}
+      {/* Remove button — always visible on touch, hover-revealed on desktop */}
       <button
         onClick={onRemove}
         title="Remove from pick list"
-        className="p-1 text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+        className="p-2 sm:p-1 text-zinc-500 sm:text-zinc-700 hover:text-red-400 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
       >
         <svg
           className="w-3.5 h-3.5"
@@ -1039,6 +1085,18 @@ function PickListRow({
           />
         </svg>
       </button>
+    </div>
+    {/* Mobile-only notes input row */}
+    <div className="sm:hidden px-3 pb-2">
+      <input
+        type="text"
+        value={entry.notes}
+        onChange={(e) => onUpdateNotes(e.target.value)}
+        placeholder="notes…"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-2 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600"
+      />
+    </div>
     </div>
   );
 }
