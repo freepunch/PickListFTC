@@ -510,21 +510,16 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { event, teams, lastUpdated, loading, refreshEvent, highContrast, setHighContrast } = useEvent();
+  const { event, teams, lastUpdated, loading, refreshEvent } = useEvent();
   const { user, showTeamPrompt, showMigrationPrompt } = useAuth();
   const { isEventFavorited, toggleEventFav } = useFavorites();
   const [showReportSearch, setShowReportSearch] = useState(false);
   const [reportQuery, setReportQuery] = useState("");
   const [, setTick] = useState(0);
-  const [isMac, setIsMac] = useState(false);
   const [tickerScroll, setTickerScroll] = useState(false);
   const [tickerVars, setTickerVars] = useState({ distance: "0px", duration: "8s" });
   const tickerTextRef = useRef<HTMLSpanElement>(null);
   const tickerContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setIsMac(navigator.platform.toUpperCase().includes("MAC"));
-  }, []);
 
   // Measure ticker overflow and set up ResizeObserver for sidebar width changes.
   // The span always has white-space:nowrap via inline style so scrollWidth is the
@@ -641,6 +636,18 @@ function SidebarContent({
         href: it.href, label: it.label, icon: it.icon, needsEvent: false,
         section: i === 0 ? "season-divider" : undefined,
       })),
+      {
+        href: "/settings",
+        label: "Settings",
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a6.759 6.759 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+        needsEvent: false,
+        section: "settings-divider",
+      },
     ];
 
     return (
@@ -667,7 +674,7 @@ function SidebarContent({
                 ? pathname === "/dashboard"
                 : pathname.startsWith(it.href);
             const disabled = it.needsEvent && !hasEvent;
-            const showDivider = it.section === "season-divider";
+            const showDivider = it.section === "season-divider" || it.section === "settings-divider";
 
             // Special: Team Report opens a numeric prompt
             if (it.section === "report") {
@@ -850,37 +857,27 @@ function SidebarContent({
             );
           })}
         </NavGroup>
+
+        {/* Settings \u2014 bottom of nav */}
+        <div className="mt-2">
+          <NavLink
+            href="/settings"
+            label="Settings"
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a6.759 6.759 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            }
+            isActive={pathname === "/settings"}
+            collapsed={collapsed}
+            onClick={onNavClick}
+          />
+        </div>
       </nav>
 
       {/* My Events panel */}
       <MyEventsPanel collapsed={collapsed} onSelectEvent={onNavClick} />
-
-      {/* High-contrast + Cmd+K hint */}
-      <div className={`px-3 ${collapsed ? "flex justify-center" : ""}`}>
-        <button
-          onClick={() => setHighContrast(!highContrast)}
-          title="Toggle high contrast"
-          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors min-h-[40px] ${
-            highContrast ? "bg-amber-500/15 text-amber-400" : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"
-          } ${collapsed ? "justify-center" : "w-full"}`}
-        >
-          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-          </svg>
-          {!collapsed && <span>{highContrast ? "High Contrast" : "Contrast"}</span>}
-        </button>
-      </div>
-
-      {!collapsed && (
-        <div className="px-3 pb-1">
-          <p className="text-[10px] text-zinc-700 flex items-center gap-1.5">
-            <kbd className="bg-zinc-800 border border-zinc-700/50 rounded px-1 py-0.5 font-mono text-zinc-600">
-              {isMac ? "\u2318K" : "Ctrl+K"}
-            </kbd>
-            <span>Quick switch</span>
-          </p>
-        </div>
-      )}
 
       {/* Footer — event info */}
       <div data-tutorial="sidebar-footer" className="p-3 border-t border-[var(--border)]">
@@ -954,34 +951,17 @@ function SidebarContent({
         </div>
 
         {!collapsed && (
-          <div className="mt-3 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-zinc-500">
-                Built by{" "}
-                <a href="https://ftrobotics.com" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
-                  First Try #21364
-                </a>
-              </p>
-              <a
-                href="/docs"
-                title="Documentation"
-                className="text-zinc-600 hover:text-zinc-400 transition-colors p-0.5 rounded"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                </svg>
-              </a>
-            </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            Built by{" "}
             <a
-              href="/donate"
-              className="flex items-center gap-1.5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors w-fit"
+              href="https://ftrobotics.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-400 transition-colors"
             >
-              <svg className="w-3 h-3 text-rose-400/60" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
-              </svg>
-              Support PickListFTC
+              First Try #21364
             </a>
-          </div>
+          </p>
         )}
       </div>
 

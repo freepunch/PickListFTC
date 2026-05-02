@@ -520,9 +520,8 @@ export default function LeaderboardPage() {
   const [hasNotesFilter, setHasNotesFilter] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { teamHasNotes, exportNotes, importNotes } = useNotes();
+  const { teamHasNotes } = useNotes();
   const { isTeamFavorited, toggleTeamFav } = useFavorites();
-  const importInputRef = useRef<HTMLInputElement>(null);
 
   const currentTab = TABS.find((t) => t.id === activeTab)!;
   const columns = currentTab.columns;
@@ -728,53 +727,6 @@ export default function LeaderboardPage() {
                 <span className="hidden sm:inline">Has Notes</span>
               </button>
 
-              {/* Export notes */}
-              {event && (
-                <button
-                  onClick={exportNotes}
-                  title="Export scout notes as JSON"
-                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-500 border border-zinc-800 bg-zinc-900 hover:text-zinc-300 transition-colors whitespace-nowrap"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span className="hidden sm:inline">Export</span>
-                </button>
-              )}
-
-              {/* Import notes */}
-              {event && (
-                <>
-                  <input
-                    ref={importInputRef}
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        if (typeof ev.target?.result === "string") {
-                          importNotes(ev.target.result);
-                        }
-                      };
-                      reader.readAsText(file);
-                      e.target.value = "";
-                    }}
-                  />
-                  <button
-                    onClick={() => importInputRef.current?.click()}
-                    title="Import scout notes from JSON"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-500 border border-zinc-800 bg-zinc-900 hover:text-zinc-300 transition-colors whitespace-nowrap"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                    </svg>
-                    <span className="hidden sm:inline">Import</span>
-                  </button>
-                </>
-              )}
             </div>
 
             {/* Results count */}
