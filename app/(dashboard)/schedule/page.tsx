@@ -107,6 +107,55 @@ function StatusBadge({
   );
 }
 
+// ── Heatmap bar: 4px-tall colored strip whose intensity reflects combined OPR
+// relative to the event-wide range. Positioned absolutely at the bottom of the
+// alliance cell so team numbers sit on top.
+function HeatmapBar({
+  side,
+  oprSum,
+  min,
+  max,
+  played,
+  outcome,
+}: {
+  side: "red" | "blue";
+  oprSum: number;
+  min: number;
+  max: number;
+  /** When true, this match has been played; outcome marker is shown. */
+  played: boolean;
+  /** "win" | "loss" | "tie" relative to this side. Only used when played. */
+  outcome: "win" | "loss" | "tie";
+}) {
+  // Intensity: 0..1. If event has no spread, fall back to 0.5.
+  const span = max - min;
+  const t = span > 0 ? Math.max(0, Math.min(1, (oprSum - min) / span)) : 0.5;
+  // Map t to opacity 0.2..0.8 per spec.
+  const opacity = 0.2 + 0.6 * t;
+  // Saturation effect via mixing toward zinc-700 at low t.
+  const colorClass = side === "red" ? "bg-red-500" : "bg-blue-500";
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-1 overflow-hidden"
+    >
+      <div
+        className={`h-full ${colorClass} transition-opacity duration-300`}
+        style={{ opacity }}
+      />
+      {played && outcome !== "tie" && (
+        <span
+          className={`absolute -top-3 ${side === "red" ? "left-1.5" : "right-1.5"} text-[10px] font-bold leading-none ${
+            outcome === "win" ? "text-emerald-400/80" : "text-zinc-600"
+          }`}
+        >
+          {outcome === "win" ? "✓" : "✗"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function AllianceCell({
   teams,
   side,
@@ -114,6 +163,9 @@ function AllianceCell({
   brighter,
   myTeam,
   isPrescout,
+  heatmapRange,
+  played,
+  outcome,
 }: {
   teams: [number, number];
   side: "red" | "blue";
@@ -121,22 +173,123 @@ function AllianceCell({
   brighter: boolean;
   myTeam: number | null;
   isPrescout: boolean;
+  heatmapRange: { min: number; max: number } | null;
+  played: boolean;
+  outcome: "win" | "loss" | "tie";
 }) {
   const tone = side === "red" ? "text-red-300" : "text-blue-300";
   const muted = side === "red" ? "text-red-400/50" : "text-blue-400/50";
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="flex items-center gap-3">
+    <div className="relative flex flex-col items-center gap-0.5">
+      {heatmapRange && oprSum > 0 && !isPrescout && (
+        <HeatmapBar
+          side={side}
+          oprSum={oprSum}
+          min={heatmapRange.min}
+          max={heatmapRange.max}
+          played={played}
+          outcome={outcome}
+        />
+      )}
+      <div className="relative z-10 flex items-center gap-3">
         <TeamLink num={teams[0]} highlight={myTeam === teams[0]} />
         <TeamLink num={teams[1]} highlight={myTeam === teams[1]} />
       </div>
       {!isPrescout && oprSum > 0 && (
         <span
-          className={`text-[10px] font-mono tabular-nums ${brighter ? tone : muted}`}
+          className={`relative z-10 text-[10px] font-mono tabular-nums ${brighter ? tone : muted}`}
         >
           {oprSum.toFixed(1)}
         </span>
       )}
+    </div>
+  );
+}
+
+// ── Win-probability donut: animated SVG ring showing red vs blue win odds.
+// Center text shows the favored alliance's predicted score.
+function WinProbDonut({
+  redWinProb,
+  redPred,
+  bluePred,
+  size = 48,
+}: {
+  redWinProb: number;
+  redPred: number;
+  bluePred: number;
+  size?: number;
+}) {
+  const [animatedProb, setAnimatedProb] = useState(0.5);
+  useEffect(() => {
+    // Animate from 50/50 to actual on mount / when redWinProb changes.
+    const id = window.requestAnimationFrame(() => setAnimatedProb(redWinProb));
+    return () => window.cancelAnimationFrame(id);
+  }, [redWinProb]);
+
+  const radius = size / 2 - 6; // stroke 6, fits inside size
+  const circumference = 2 * Math.PI * radius;
+  // Gap at 12 o'clock: rotate the visible segments by -90deg and add a small gap.
+  const gapPx = 4;
+  const usable = circumference - gapPx;
+  const redLen = usable * animatedProb;
+  const blueLen = usable * (1 - animatedProb);
+
+  const redFavored = redPred >= bluePred;
+  const favoredScore = redFavored ? redPred : bluePred;
+  const favoredColor = redFavored ? "text-red-300" : "text-blue-300";
+  const redPct = Math.round(animatedProb * 100);
+  const bluePct = 100 - redPct;
+
+  return (
+    <div
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
+      title={`Red ${redPct}% — Blue ${bluePct}%`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Background ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgb(63 63 70)" /* zinc-700 */
+          strokeWidth={6}
+        />
+        {/* Red arc */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgb(248 113 113)" /* red-400 */
+          strokeWidth={6}
+          strokeLinecap="round"
+          strokeDasharray={`${redLen} ${circumference}`}
+          strokeDashoffset={circumference / 4 - gapPx / 2}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: "stroke-dasharray 320ms ease-out" }}
+        />
+        {/* Blue arc starts where red ended (clockwise). */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgb(96 165 250)" /* blue-400 */
+          strokeWidth={6}
+          strokeLinecap="round"
+          strokeDasharray={`${blueLen} ${circumference}`}
+          strokeDashoffset={-redLen + circumference / 4 - gapPx / 2}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: "stroke-dasharray 320ms ease-out, stroke-dashoffset 320ms ease-out" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`font-mono text-[11px] font-semibold tabular-nums ${favoredColor}`}>
+          {favoredScore}
+        </span>
+      </div>
     </div>
   );
 }
@@ -181,27 +334,23 @@ function ScoreDisplay({
       </div>
     );
   }
+  // Upcoming match: show the win-probability donut.
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-end gap-2">
-        <span className="font-mono text-xs text-red-400/60 italic tabular-nums">
+    <div className="flex items-center justify-end gap-2.5">
+      <div className="flex flex-col items-end">
+        <span className="font-mono text-[10px] text-red-400/60 italic tabular-nums leading-tight">
           ~{m.redPred}
         </span>
-        <span className="text-zinc-700 text-[10px]">–</span>
-        <span className="font-mono text-xs text-blue-400/60 italic tabular-nums">
+        <span className="font-mono text-[10px] text-blue-400/60 italic tabular-nums leading-tight">
           ~{m.bluePred}
         </span>
       </div>
-      <div className="h-1.5 rounded-full overflow-hidden flex w-24 ml-auto">
-        <div
-          className="bg-red-500/60 transition-all"
-          style={{ width: `${m.redWinProb * 100}%` }}
-        />
-        <div
-          className="bg-blue-500/60 transition-all"
-          style={{ width: `${(1 - m.redWinProb) * 100}%` }}
-        />
-      </div>
+      <WinProbDonut
+        redWinProb={m.redWinProb}
+        redPred={m.redPred}
+        bluePred={m.bluePred}
+        size={48}
+      />
     </div>
   );
 }
@@ -569,6 +718,324 @@ function AddToPickListButtonWithLabel({
   );
 }
 
+// ── BattleCard: head-to-head VS layout used as match expansion content.
+// Works for both completed and upcoming matches.
+
+function BattleStatBar({
+  label,
+  redValue,
+  blueValue,
+  redLabel,
+  blueLabel,
+  invertWinner = false,
+}: {
+  label: string;
+  redValue: number;
+  blueValue: number;
+  redLabel: string;
+  blueLabel: string;
+  /** When true, the LOWER value is the better outcome (e.g., penalties). */
+  invertWinner?: boolean;
+}) {
+  const max = Math.max(redValue, blueValue, 0.0001);
+  const redPct = Math.max(0, Math.min(1, redValue / max)) * 100;
+  const bluePct = Math.max(0, Math.min(1, blueValue / max)) * 100;
+
+  // Highlight the favoured side for this stat.
+  const redFavored = invertWinner ? redValue < blueValue : redValue > blueValue;
+  const blueFavored = invertWinner ? blueValue < redValue : blueValue > redValue;
+
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+      {/* Red side — bar grows from center toward the left edge */}
+      <div className="flex flex-row-reverse items-center gap-2 min-w-0">
+        <span className={`font-mono text-xs tabular-nums ${redFavored ? "text-red-300 font-semibold" : "text-red-400/60"}`}>
+          {redLabel}
+        </span>
+        <div className="h-1.5 flex-1 max-w-[140px] flex flex-row-reverse">
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${redFavored ? "bg-red-500/80" : "bg-red-500/40"}`}
+            style={{ width: `${redPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Center label */}
+      <span className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 whitespace-nowrap">
+        {label}
+      </span>
+
+      {/* Blue side — bar grows from center toward the right edge */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="h-1.5 flex-1 max-w-[140px]">
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${blueFavored ? "bg-blue-500/80" : "bg-blue-500/40"}`}
+            style={{ width: `${bluePct}%` }}
+          />
+        </div>
+        <span className={`font-mono text-xs tabular-nums ${blueFavored ? "text-blue-300 font-semibold" : "text-blue-400/60"}`}>
+          {blueLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function tacticalInsight(args: {
+  redPred: number;
+  bluePred: number;
+  redAuto: number;
+  blueAuto: number;
+  redDc: number;
+  blueDc: number;
+  redPenalty: number;
+  bluePenalty: number;
+}): string {
+  const { redPred, bluePred, redAuto, blueAuto, redDc, blueDc, redPenalty, bluePenalty } = args;
+  const predDiff = Math.abs(redPred - bluePred);
+  const autoLeader = redAuto > blueAuto ? "Red" : blueAuto > redAuto ? "Blue" : null;
+  const dcLeader = redDc > blueDc ? "Red" : blueDc > redDc ? "Blue" : null;
+  const autoGap = Math.abs(redAuto - blueAuto);
+  const dcGap = Math.abs(redDc - blueDc);
+
+  // Auto/DC split — opposite leaders with meaningful margins
+  if (autoLeader && dcLeader && autoLeader !== dcLeader && autoGap > 6 && dcGap > 8) {
+    return `${autoLeader} dominates auto, ${dcLeader} stronger in driver-controlled — expect a close finish.`;
+  }
+
+  // Big predicted gap
+  if (predDiff >= 40) {
+    const favored = redPred > bluePred ? "Red" : "Blue";
+    const underdog = favored === "Red" ? "Blue" : "Red";
+    return `${favored} favored by ${Math.round(predDiff)}+ points — ${underdog} needs a standout performance.`;
+  }
+
+  // High penalty risk on either side
+  const worstPenalty = Math.max(redPenalty, bluePenalty);
+  if (worstPenalty >= 10) {
+    const culprit = redPenalty > bluePenalty ? "Red" : "Blue";
+    return `Watch for ${culprit} penalties — they average ${worstPenalty.toFixed(1)} pts/match in fouls.`;
+  }
+
+  if (predDiff < 12) {
+    return "Tight matchup — consistency will decide this one.";
+  }
+
+  const favored = redPred > bluePred ? "Red" : "Blue";
+  return `${favored} has a moderate edge on paper — execution will tell.`;
+}
+
+function BattleCard({
+  m,
+  oprMap,
+  autoMap,
+  dcMap,
+  devMap,
+  penaltyMap,
+  teamNameMap,
+  isPrescout,
+}: {
+  m: ParsedMatch;
+  oprMap: Map<number, number>;
+  autoMap: Map<number, number>;
+  dcMap: Map<number, number>;
+  devMap: Map<number, number>;
+  penaltyMap: Map<number, number>;
+  teamNameMap: Map<number, string>;
+  isPrescout: boolean;
+}) {
+  // Per-alliance aggregates (totals across both teams).
+  const sum = (map: Map<number, number>, teams: [number, number]) =>
+    (map.get(teams[0]) ?? 0) + (map.get(teams[1]) ?? 0);
+
+  const redAuto = sum(autoMap, m.red);
+  const blueAuto = sum(autoMap, m.blue);
+  const redDc = sum(dcMap, m.red);
+  const blueDc = sum(dcMap, m.blue);
+  const redDev = sum(devMap, m.red);
+  const blueDev = sum(devMap, m.blue);
+  const redPenalty = sum(penaltyMap, m.red);
+  const bluePenalty = sum(penaltyMap, m.blue);
+
+  // Consistency: lower dev = better. Convert into a positive score for the bar
+  // visualization. Floor at 1 to avoid divide-by-zero / huge ratios.
+  const redConsistency = redDev > 0 ? 100 / Math.max(redDev, 1) : 0;
+  const blueConsistency = blueDev > 0 ? 100 / Math.max(blueDev, 1) : 0;
+
+  // Outcome state (only meaningful when played).
+  const tied = m.played && m.redScore === m.blueScore;
+  const redWon = m.played && (m.redScore ?? 0) > (m.blueScore ?? 0);
+  const blueWon = m.played && (m.blueScore ?? 0) > (m.redScore ?? 0);
+  const predRedWin = m.redPred > m.bluePred;
+  const actualRedWin = (m.redScore ?? 0) > (m.blueScore ?? 0);
+  const predictionCorrect =
+    m.played && !tied && m.redPred !== m.bluePred ? predRedWin === actualRedWin : null;
+
+  function AllianceColumn({ side }: { side: "red" | "blue" }) {
+    const teams = side === "red" ? m.red : m.blue;
+    const bg = side === "red" ? "bg-red-500/5 border-red-500/20" : "bg-blue-500/5 border-blue-500/20";
+    const dot = side === "red" ? "bg-red-500" : "bg-blue-500";
+    const label = side === "red" ? "Red Alliance" : "Blue Alliance";
+    const labelColor = side === "red" ? "text-red-300" : "text-blue-300";
+    const oprColor = side === "red" ? "text-red-300" : "text-blue-300";
+    const oprSum = side === "red" ? m.redOpr : m.blueOpr;
+    const score = side === "red" ? m.redScore : m.blueScore;
+    const won = side === "red" ? redWon : blueWon;
+
+    return (
+      <div className={`flex-1 rounded-xl border ${bg} p-4`}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`w-2 h-2 rounded-full ${dot}`} />
+          <span className={`text-[10px] font-medium uppercase tracking-wider ${labelColor}`}>
+            {label}
+          </span>
+          {won && (
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+              Win
+            </span>
+          )}
+        </div>
+        <div className="space-y-1.5 mb-3">
+          {teams.map((n) => (
+            <div key={n} className="flex items-center gap-2">
+              <Link
+                href={`/report/${n}`}
+                onClick={(e) => e.stopPropagation()}
+                className={`font-mono text-base font-bold hover:underline ${oprColor}`}
+              >
+                {n || "—"}
+              </Link>
+              <span className="text-xs text-zinc-500 truncate">
+                {teamNameMap.get(n) || ""}
+              </span>
+            </div>
+          ))}
+        </div>
+        {m.played && score !== null ? (
+          <div className="flex items-baseline gap-2 pt-2 border-t border-zinc-800/40">
+            <span className={`font-mono text-2xl font-bold ${oprColor}`}>{score.toFixed(0)}</span>
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">actual</span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-2 pt-2 border-t border-zinc-800/40">
+            <span className={`font-mono text-2xl font-bold ${oprColor}`}>{oprSum.toFixed(1)}</span>
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">combined OPR</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* VS layout */}
+      <div className="flex flex-col sm:flex-row items-stretch gap-3 relative">
+        <AllianceColumn side="red" />
+        <div className="flex sm:flex-col items-center justify-center text-zinc-500 select-none">
+          <span className="font-bold text-xs sm:text-sm tracking-[0.3em] text-zinc-600">VS</span>
+        </div>
+        <AllianceColumn side="blue" />
+      </div>
+
+      {/* Stat bars (skip in prescout when most maps are empty) */}
+      {!isPrescout && (
+        <div className="space-y-2.5 px-1">
+          <BattleStatBar
+            label="Auto OPR"
+            redValue={redAuto}
+            blueValue={blueAuto}
+            redLabel={redAuto.toFixed(1)}
+            blueLabel={blueAuto.toFixed(1)}
+          />
+          <BattleStatBar
+            label="DC OPR"
+            redValue={redDc}
+            blueValue={blueDc}
+            redLabel={redDc.toFixed(1)}
+            blueLabel={blueDc.toFixed(1)}
+          />
+          <BattleStatBar
+            label="Consistency"
+            redValue={redConsistency}
+            blueValue={blueConsistency}
+            redLabel={redDev > 0 ? `±${redDev.toFixed(1)}` : "—"}
+            blueLabel={blueDev > 0 ? `±${blueDev.toFixed(1)}` : "—"}
+          />
+          {(redPenalty > 0 || bluePenalty > 0) && (
+            <BattleStatBar
+              label="Penalties"
+              redValue={redPenalty}
+              blueValue={bluePenalty}
+              redLabel={redPenalty.toFixed(1)}
+              blueLabel={bluePenalty.toFixed(1)}
+              invertWinner
+            />
+          )}
+        </div>
+      )}
+
+      {/* Tactical insight — only meaningful for upcoming matches */}
+      {!m.played && !isPrescout && (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg px-3 py-2.5 flex items-start gap-2">
+          <svg className="w-4 h-4 text-amber-400/70 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+          </svg>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            {tacticalInsight({
+              redPred: m.redPred, bluePred: m.bluePred,
+              redAuto, blueAuto, redDc, blueDc,
+              redPenalty, bluePenalty,
+            })}
+          </p>
+        </div>
+      )}
+
+      {/* Predicted vs Actual — only meaningful for completed matches */}
+      {m.played && (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg px-4 py-3">
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Predicted</p>
+              <p className="font-mono text-zinc-300">
+                <span className="text-red-300">Red {m.redPred}</span>
+                <span className="text-zinc-600 mx-1.5">–</span>
+                <span className="text-blue-300">{m.bluePred} Blue</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Actual</p>
+              <p className="font-mono text-zinc-300">
+                <span className="text-red-300">Red {m.redScore?.toFixed(0) ?? "—"}</span>
+                <span className="text-zinc-600 mx-1.5">–</span>
+                <span className="text-blue-300">{m.blueScore?.toFixed(0) ?? "—"} Blue</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-zinc-800/60">
+            {tied ? (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Tie</span>
+            ) : predictionCorrect === true ? (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                As Expected
+              </span>
+            ) : predictionCorrect === false ? (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Upset!
+              </span>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Win/Loss tracker ──
 
 interface MyMatchOutcome {
@@ -765,11 +1232,14 @@ export default function SchedulePage() {
       .sort((a, b) => a.teamNumber - b.teamNumber);
   }, [event]);
 
-  // OPR + dev + name maps
-  const { oprMap, devMap, teamNameMap } = useMemo(() => {
+  // OPR + dev + name + auto/dc/penalty maps
+  const { oprMap, devMap, teamNameMap, autoMap, dcMap, penaltyMap } = useMemo(() => {
     const opr = new Map<number, number>();
     const dev = new Map<number, number>();
     const name = new Map<number, string>();
+    const auto = new Map<number, number>();
+    const dc = new Map<number, number>();
+    const penalty = new Map<number, number>();
 
     if (event) {
       for (const tep of event.teams) {
@@ -779,7 +1249,6 @@ export default function SchedulePage() {
 
     if (isPrescout) {
       for (const t of prescoutRanking) opr.set(t.teamNumber, t.bestOpr);
-      // Dev from season-best event for each prescout team
       for (const t of prescoutData) {
         const best = t.events
           .filter((e) => e.stats !== null)
@@ -787,15 +1256,27 @@ export default function SchedulePage() {
           .reduce((max, v) => Math.max(max, v), 0);
         if (best > 0) dev.set(t.number, best);
         if (t.name) name.set(t.number, t.name);
+        // Best season auto/dc OPR for prescout battle card
+        const bestAuto = t.events
+          .map((e) => e.stats?.opr?.autoPoints ?? 0)
+          .reduce((m, v) => Math.max(m, v), 0);
+        const bestDc = t.events
+          .map((e) => e.stats?.opr?.dcPoints ?? 0)
+          .reduce((m, v) => Math.max(m, v), 0);
+        if (bestAuto > 0) auto.set(t.number, bestAuto);
+        if (bestDc > 0) dc.set(t.number, bestDc);
       }
     } else {
       for (const t of teams) {
         opr.set(t.teamNumber, t.stats.opr.totalPointsNp);
         dev.set(t.teamNumber, t.stats.dev.totalPointsNp);
         name.set(t.teamNumber, t.teamName);
+        auto.set(t.teamNumber, t.stats.opr.autoPoints);
+        dc.set(t.teamNumber, t.stats.opr.dcPoints);
+        penalty.set(t.teamNumber, t.stats.avg.penaltyPointsCommitted ?? 0);
       }
     }
-    return { oprMap: opr, devMap: dev, teamNameMap: name };
+    return { oprMap: opr, devMap: dev, teamNameMap: name, autoMap: auto, dcMap: dc, penaltyMap: penalty };
   }, [teams, event, isPrescout, prescoutRanking, prescoutData]);
 
   // Wildcard threshold (top 25% of dev)
@@ -855,6 +1336,20 @@ export default function SchedulePage() {
         };
       });
   }, [event, oprMap]);
+
+  // Event-wide heatmap range: min/max combined alliance OPR across all matches.
+  // Used to scale the saturation/opacity of the heatmap bar behind alliance cells.
+  const heatmapRange = useMemo(() => {
+    if (isPrescout || allMatches.length === 0) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const m of allMatches) {
+      if (m.redOpr > 0) { min = Math.min(min, m.redOpr); max = Math.max(max, m.redOpr); }
+      if (m.blueOpr > 0) { min = Math.min(min, m.blueOpr); max = Math.max(max, m.blueOpr); }
+    }
+    if (!isFinite(min) || !isFinite(max) || max <= 0) return null;
+    return { min, max };
+  }, [allMatches, isPrescout]);
 
   // On Deck = first unplayed; In The Hole = second unplayed
   const { onDeckId, inTheHoleId } = useMemo(() => {
@@ -1294,7 +1789,7 @@ export default function SchedulePage() {
                                     Q{m.matchNum}
                                   </span>
                                 </td>
-                                <td className="px-3 py-3 bg-red-500/10">
+                                <td className="relative px-3 py-3 bg-red-500/10">
                                   <AllianceCell
                                     teams={m.red}
                                     side="red"
@@ -1302,9 +1797,20 @@ export default function SchedulePage() {
                                     brighter={redBrighter}
                                     myTeam={myTeam}
                                     isPrescout={isPrescout}
+                                    heatmapRange={heatmapRange}
+                                    played={m.played}
+                                    outcome={
+                                      m.played
+                                        ? (m.redScore ?? 0) > (m.blueScore ?? 0)
+                                          ? "win"
+                                          : (m.redScore ?? 0) < (m.blueScore ?? 0)
+                                            ? "loss"
+                                            : "tie"
+                                        : "tie"
+                                    }
                                   />
                                 </td>
-                                <td className="px-3 py-3 bg-blue-500/10">
+                                <td className="relative px-3 py-3 bg-blue-500/10">
                                   <AllianceCell
                                     teams={m.blue}
                                     side="blue"
@@ -1312,6 +1818,17 @@ export default function SchedulePage() {
                                     brighter={blueBrighter}
                                     myTeam={myTeam}
                                     isPrescout={isPrescout}
+                                    heatmapRange={heatmapRange}
+                                    played={m.played}
+                                    outcome={
+                                      m.played
+                                        ? (m.blueScore ?? 0) > (m.redScore ?? 0)
+                                          ? "win"
+                                          : (m.blueScore ?? 0) < (m.redScore ?? 0)
+                                            ? "loss"
+                                            : "tie"
+                                        : "tie"
+                                    }
                                   />
                                 </td>
                                 <td className="px-4 py-3 text-right">
@@ -1341,22 +1858,16 @@ export default function SchedulePage() {
                               {isExpanded && (
                                 <tr className="bg-zinc-800/20 border-b border-zinc-800/50">
                                   <td colSpan={5} className="px-5 py-4">
-                                    {m.played ? (
-                                      <CompletedDetail
-                                        m={m}
-                                        oprMap={oprMap}
-                                        predictionCorrect={predictionCorrect}
-                                      />
-                                    ) : (
-                                      <UpcomingDetail
-                                        m={m}
-                                        oprMap={oprMap}
-                                        devMap={devMap}
-                                        wildcardThreshold={wildcardThreshold}
-                                        myTeam={myTeam}
-                                        teamNameMap={teamNameMap}
-                                      />
-                                    )}
+                                    <BattleCard
+                                      m={m}
+                                      oprMap={oprMap}
+                                      autoMap={autoMap}
+                                      dcMap={dcMap}
+                                      devMap={devMap}
+                                      penaltyMap={penaltyMap}
+                                      teamNameMap={teamNameMap}
+                                      isPrescout={isPrescout}
+                                    />
                                   </td>
                                 </tr>
                               )}
@@ -1475,22 +1986,16 @@ export default function SchedulePage() {
 
                         {isExpanded && (
                           <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-4">
-                            {m.played ? (
-                              <CompletedDetail
-                                m={m}
-                                oprMap={oprMap}
-                                predictionCorrect={predictionCorrect}
-                              />
-                            ) : (
-                              <UpcomingDetail
-                                m={m}
-                                oprMap={oprMap}
-                                devMap={devMap}
-                                wildcardThreshold={wildcardThreshold}
-                                myTeam={myTeam}
-                                teamNameMap={teamNameMap}
-                              />
-                            )}
+                            <BattleCard
+                              m={m}
+                              oprMap={oprMap}
+                              autoMap={autoMap}
+                              dcMap={dcMap}
+                              devMap={devMap}
+                              penaltyMap={penaltyMap}
+                              teamNameMap={teamNameMap}
+                              isPrescout={isPrescout}
+                            />
                           </div>
                         )}
                       </Fragment>
