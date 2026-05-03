@@ -90,24 +90,6 @@ const SEASON_NAV = [
       </svg>
     ),
   },
-  {
-    href: "/watched",
-    label: "Watched Teams",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/picklists",
-    label: "All Pick Lists",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-      </svg>
-    ),
-  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -580,13 +562,10 @@ function SidebarContent({
           }
         }}
         title={collapsed ? "Team Report" : undefined}
-        disabled={!hasEvent}
         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 min-h-[40px] ${
           reportActive
             ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-            : !hasEvent
-              ? "text-zinc-700 cursor-not-allowed"
-              : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
         } ${collapsed ? "justify-center" : ""}`}
       >
         <span className="shrink-0">
@@ -630,8 +609,8 @@ function SidebarContent({
       ...PLAN_NAV.map((it) => ({
         href: it.href, label: it.label, icon: it.icon, needsEvent: true,
       })),
-      // Team Report — special: opens a number prompt instead of a route
-      { href: "/report", label: "Team Report", icon: SCOUT_NAV.find((it) => it.isReport)!.icon, needsEvent: true, section: "report" },
+      // Team Report — special: opens a number prompt instead of a route. Works without an event.
+      { href: "/report", label: "Team Report", icon: SCOUT_NAV.find((it) => it.isReport)!.icon, needsEvent: false, section: "report" },
       ...SEASON_NAV.map((it, i) => ({
         href: it.href, label: it.label, icon: it.icon, needsEvent: false,
         section: i === 0 ? "season-divider" : undefined,
@@ -840,10 +819,8 @@ function SidebarContent({
         >
           {SEASON_NAV.map((item) => {
             const isActive = item.href === "/season"
-              ? pathname === "/season"
-              : item.href === "/picklists"
-                ? pathname === "/picklists"
-                : pathname.startsWith(item.href);
+              ? pathname.startsWith("/season")
+              : pathname.startsWith(item.href);
             return (
               <NavLink
                 key={item.href}

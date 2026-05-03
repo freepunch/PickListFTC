@@ -180,7 +180,7 @@ export default function TeamReportPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { loadEvent, teams: eventTeams } = useEvent();
+  const { loadEvent, teams: eventTeams, event: loadedEvent } = useEvent();
   const { notesForTeam, sharedNotesForTeam, deleteNote, toggleNoteShared } = useNotes();
   const { isTeamFavorited, toggleTeamFav } = useFavorites();
   const { user, profile } = useAuth();
@@ -447,6 +447,42 @@ export default function TeamReportPage({
           </p>
         </div>
       </div>
+
+      {/* At This Event — only when an event is loaded and this team is at it */}
+      {(() => {
+        if (!loadedEvent) return null;
+        const eventTeam = eventTeams.find((t) => t.teamNumber === teamNumber);
+        if (!eventTeam) return null;
+        const s = eventTeam.stats;
+        return (
+          <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/20 rounded-xl p-5">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-[10px] font-medium text-[var(--accent)] uppercase tracking-wider mb-1">
+                  At this event
+                </p>
+                <p className="text-sm font-semibold text-white">{loadedEvent.name}</p>
+              </div>
+              <div className="flex items-baseline gap-5 text-right">
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Rank</p>
+                  <p className="font-mono text-lg font-bold text-white">#{s.rank}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">W-L-T</p>
+                  <p className="font-mono text-lg font-bold text-white">{getWLT(s)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Event OPR</p>
+                  <p className="font-mono text-lg font-bold text-white">
+                    {s.opr.totalPointsNp.toFixed(1)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Scout Notes */}
       {(() => {
