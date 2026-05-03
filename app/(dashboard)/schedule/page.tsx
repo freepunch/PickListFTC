@@ -108,8 +108,8 @@ function StatusBadge({
 }
 
 // ── Heatmap bar: 4px-tall colored strip whose intensity reflects combined OPR
-// relative to the event-wide range. Positioned absolutely at the bottom of the
-// alliance cell so team numbers sit on top.
+// relative to the event-wide range. Rendered in normal flow as the last item
+// in the alliance cell so it sits BELOW the team numbers and combined OPR text.
 function HeatmapBar({
   side,
   oprSum,
@@ -132,20 +132,19 @@ function HeatmapBar({
   const t = span > 0 ? Math.max(0, Math.min(1, (oprSum - min) / span)) : 0.5;
   // Map t to opacity 0.2..0.8 per spec.
   const opacity = 0.2 + 0.6 * t;
-  // Saturation effect via mixing toward zinc-700 at low t.
   const colorClass = side === "red" ? "bg-red-500" : "bg-blue-500";
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-1 overflow-hidden"
+      className="relative w-full h-1 mt-1 rounded-full overflow-hidden pointer-events-none"
     >
       <div
-        className={`h-full ${colorClass} transition-opacity duration-300`}
+        className={`h-full w-full ${colorClass} transition-opacity duration-300`}
         style={{ opacity }}
       />
       {played && outcome !== "tie" && (
         <span
-          className={`absolute -top-3 ${side === "red" ? "left-1.5" : "right-1.5"} text-[10px] font-bold leading-none ${
+          className={`absolute -top-3.5 ${side === "red" ? "left-0" : "right-0"} text-[10px] font-bold leading-none ${
             outcome === "win" ? "text-emerald-400/80" : "text-zinc-600"
           }`}
         >
@@ -180,7 +179,19 @@ function AllianceCell({
   const tone = side === "red" ? "text-red-300" : "text-blue-300";
   const muted = side === "red" ? "text-red-400/50" : "text-blue-400/50";
   return (
-    <div className="relative flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 w-full">
+      {/* Line 1: team numbers */}
+      <div className="flex items-center gap-3">
+        <TeamLink num={teams[0]} highlight={myTeam === teams[0]} />
+        <TeamLink num={teams[1]} highlight={myTeam === teams[1]} />
+      </div>
+      {/* Line 2: combined OPR */}
+      {!isPrescout && oprSum > 0 && (
+        <span className={`text-[10px] font-mono tabular-nums ${brighter ? tone : muted}`}>
+          {oprSum.toFixed(1)}
+        </span>
+      )}
+      {/* Line 3: heatmap bar (in normal flow, below text) */}
       {heatmapRange && oprSum > 0 && !isPrescout && (
         <HeatmapBar
           side={side}
@@ -190,17 +201,6 @@ function AllianceCell({
           played={played}
           outcome={outcome}
         />
-      )}
-      <div className="relative z-10 flex items-center gap-3">
-        <TeamLink num={teams[0]} highlight={myTeam === teams[0]} />
-        <TeamLink num={teams[1]} highlight={myTeam === teams[1]} />
-      </div>
-      {!isPrescout && oprSum > 0 && (
-        <span
-          className={`relative z-10 text-[10px] font-mono tabular-nums ${brighter ? tone : muted}`}
-        >
-          {oprSum.toFixed(1)}
-        </span>
       )}
     </div>
   );
