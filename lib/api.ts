@@ -108,6 +108,8 @@ const EVENT_QUERY = `
         description
         hasBeenPlayed
         scheduledStartTime
+        tournamentLevel
+        series
         scores {
           ... on MatchScores2025 {
             red {
@@ -130,6 +132,7 @@ const EVENT_QUERY = `
           teamNumber
           alliance
           station
+          allianceRole
         }
       }
     }

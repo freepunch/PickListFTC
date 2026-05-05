@@ -73,12 +73,17 @@ export interface TeamEventStats2025 {
 
 // ── Matches ──
 
-export type Alliance = "Red" | "Blue";
+export type Alliance = "Red" | "Blue" | "Solo";
+export type Station = "One" | "Two" | "NotOnField" | "Solo" | number;
+export type AllianceRole = "Captain" | "FirstPick" | "SecondPick" | "Solo";
+export type TournamentLevel = "Quals" | "Semis" | "Finals" | "DoubleElim";
 
 export interface MatchTeam {
   teamNumber: number;
   alliance: Alliance;
-  station: number;
+  /** Field station. Numbers are legacy; the API now returns enum strings. */
+  station: Station;
+  allianceRole?: AllianceRole;
 }
 
 export interface MatchScores2025Alliance {
@@ -100,6 +105,10 @@ export interface Match {
   description?: string;
   hasBeenPlayed: boolean;
   scheduledStartTime?: string | null;
+  /** "Quals" (qualification round-robin) or "Semis" / "Finals" / "DoubleElim" (playoff). */
+  tournamentLevel?: TournamentLevel;
+  /** 0 for qualification matches; 1..N for elimination series/bracket nodes. */
+  series?: number;
   scores: MatchScores2025 | null;
   teams: MatchTeam[];
 }
