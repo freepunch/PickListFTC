@@ -1,7 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
-:root {
+:root,
+.dark {
   --font-sans: "Inter", "Geist Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
@@ -19,18 +20,35 @@
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --chart-grid: #27272a;
+  --chart-tick: #71717a;
+  --chart-tooltip-bg: #18181b;
+  --chart-tooltip-border: #27272a;
+  --chart-tooltip-text: #fafafa;
+  --donut-track: rgb(63 63 70); /* zinc-700 */
 }
 
-/* High-contrast mode */
-.high-contrast {
-  --bg: #000000;
-  --bg-card: #1a1a1a;
-  --bg-card-hover: #262626;
-  --border: #525252;
-  --border-hover: #737373;
-  --foreground: #ffffff;
-  --foreground-muted: #d4d4d8;
+.light {
+  --bg: #ffffff;
+  --bg-card: #f4f4f5;
+  --bg-card-hover: #e4e4e7;
+  --border: #d4d4d8;
+  --border-hover: #a1a1aa;
+  --foreground: #09090b;
+  --foreground-muted: #52525b;
   --foreground-dim: #a1a1aa;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-muted: rgba(37, 99, 235, 0.12);
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --danger: #dc2626;
+  --chart-grid: #e4e4e7;
+  --chart-tick: #71717a;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #d4d4d8;
+  --chart-tooltip-text: #09090b;
+  --donut-track: rgb(212 212 216); /* zinc-300 */
 }
 
 * {
@@ -121,8 +139,36 @@ body {
 
 .skeleton {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
-  background-color: #27272a;
+  background-color: var(--border);
   border-radius: 0.5rem;
+}
+
+/* ── Light-mode global overrides ───────────────────────────────────────────── */
+/* Scoped to html.light so dark mode is completely unaffected.                 */
+/* These fix hardcoded zinc- classes used throughout for dark-mode-only design. */
+html.light {
+  color-scheme: light;
+
+  & .bg-zinc-950 { background-color: var(--bg); }
+  & .bg-zinc-900 { background-color: var(--bg-card); }
+  & .bg-zinc-800 { background-color: var(--bg-card-hover); }
+
+  & .border-zinc-800 { border-color: var(--border); }
+  & .border-zinc-700 { border-color: var(--border); }
+
+  /* zinc-200/300 is near-white — invisible on light backgrounds */
+  & .text-zinc-100,
+  & .text-zinc-200 { color: var(--foreground); }
+  & .text-zinc-300 { color: var(--foreground-muted); }
+
+  /* Hover and active state corrections */
+  & .hover\:bg-zinc-800:hover,
+  & .active\:bg-zinc-800:active { background-color: var(--bg-card-hover); }
+  & .hover\:bg-zinc-700:hover,
+  & .active\:bg-zinc-700:active { background-color: var(--bg-card); }
+
+  /* Sidebar: light sidebar needs a right border shadow to separate from content */
+  & aside { box-shadow: 1px 0 0 var(--border); }
 }
 
 /* Sidebar event name ticker */

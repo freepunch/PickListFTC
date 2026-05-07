@@ -4,6 +4,7 @@ import { EventProvider } from "@/context/EventContext";
 import { NotesProvider } from "@/context/NotesContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { FavoritesProvider } from "@/context/FavoritesContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -48,13 +49,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Prevent flash of wrong theme before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var keys=Object.keys(localStorage);var k=keys.find(function(k){return k.includes(':theme')});var t=k?localStorage.getItem(k):'dark';if(t==='system'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.classList.add(t||'dark');}catch(e){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
       <body>
         <AuthProvider>
-          <FavoritesProvider>
-            <EventProvider>
-              <NotesProvider>{children}</NotesProvider>
-            </EventProvider>
-          </FavoritesProvider>
+          <ThemeProvider>
+            <FavoritesProvider>
+              <EventProvider>
+                <NotesProvider>{children}</NotesProvider>
+              </EventProvider>
+            </FavoritesProvider>
+          </ThemeProvider>
         </AuthProvider>
         <Analytics />
         <SpeedInsights />

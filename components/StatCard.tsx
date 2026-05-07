@@ -21,12 +21,12 @@ export function StatCard({
         : "text-zinc-500";
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors duration-150">
-      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5">
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--border-hover)] transition-colors duration-150">
+      <p className="text-xs font-medium text-[var(--foreground-dim)] uppercase tracking-wider mb-1.5">
         {label}
       </p>
       <p
-        className={`text-2xl font-semibold text-white ${mono ? "font-mono" : ""}`}
+        className={`text-2xl font-semibold text-[var(--foreground)] ${mono ? "font-mono" : ""}`}
       >
         {value}
       </p>

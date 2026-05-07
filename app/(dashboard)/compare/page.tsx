@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useTheme } from "@/context/ThemeContext";
 import Link from "next/link";
 import {
   RadarChart,
@@ -368,7 +369,7 @@ function StatComparisonBar({
 
           return (
             <div key={team.teamNumber} className="flex items-center gap-2">
-              <div className="w-32 flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden relative">
+              <div className="w-32 flex-1 h-5 bg-[var(--border)] rounded-full overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -415,7 +416,7 @@ function PrescoutStatComparisonBar({
 
           return (
             <div key={team.teamNumber} className="flex items-center gap-2">
-              <div className="w-32 flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden relative">
+              <div className="w-32 flex-1 h-5 bg-[var(--border)] rounded-full overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -519,6 +520,7 @@ function prescoutComplementarityScore(a: PrescoutRankedTeam, b: PrescoutRankedTe
 // ── Main page ──
 
 export default function ComparePage() {
+  const { resolvedTheme } = useTheme();
   const { teams, event, loading, selectedTeams, toggleTeamSelection, clearSelection, isPrescout, prescoutRanking } =
     useEvent();
 
@@ -827,7 +829,7 @@ export default function ComparePage() {
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <RadarChart data={activeRadarData} cx="50%" cy="50%" outerRadius="75%">
-                          <PolarGrid stroke="#27272a" />
+                          <PolarGrid stroke={resolvedTheme === "dark" ? "#27272a" : "#e4e4e7"} />
                           <PolarAngleAxis
                             dataKey="stat"
                             tick={{ fill: "#71717a", fontSize: 12 }}
@@ -855,11 +857,11 @@ export default function ComparePage() {
                           ))}
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "#18181b",
-                              border: "1px solid #27272a",
+                              backgroundColor: resolvedTheme === "dark" ? "#18181b" : "#ffffff",
+                              border: `1px solid ${resolvedTheme === "dark" ? "#27272a" : "#d4d4d8"}`,
                               borderRadius: "8px",
                               fontSize: "12px",
-                              color: "#fafafa",
+                              color: resolvedTheme === "dark" ? "#fafafa" : "#09090b",
                             }}
                           />
                         </RadarChart>

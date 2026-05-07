@@ -31,7 +31,7 @@ function AuthLoadingScreen() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { highContrast, event, eventCode, loadEvent, setEventCode } = useEvent();
+  const { event, eventCode, loadEvent, setEventCode } = useEvent();
   const { user, loading: authLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -130,9 +130,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`flex min-h-screen bg-[var(--bg)] ${highContrast ? "high-contrast" : ""}`}>
+    <div className="flex min-h-screen bg-[var(--bg)]">
       {/* Mobile top bar — visible only on <768px */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-2 bg-zinc-900 border-b border-[var(--border)] md:hidden">
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-2 bg-[var(--bg-card)] border-b border-[var(--border)] md:hidden">
         <h1 className="text-lg font-bold text-white tracking-tight pl-2">
           Pick<span className="text-[var(--accent)]">List</span>FTC
         </h1>

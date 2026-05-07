@@ -166,7 +166,7 @@ function NavGroup({
   if (collapsed) {
     return (
       <div data-tutorial={dataTutorial}>
-        <div className="h-px bg-zinc-800 my-1 mx-1" />
+        <div className="h-px bg-[var(--border)] my-1 mx-1" />
         {children}
       </div>
     );
@@ -179,7 +179,7 @@ function NavGroup({
         className={`flex items-center justify-between px-3 py-1 rounded-md select-none ${
           disabled
             ? "cursor-default"
-            : "cursor-pointer hover:bg-zinc-800/60 transition-colors"
+            : "cursor-pointer hover:bg-[var(--bg-card-hover)] transition-colors"
         }`}
         onClick={disabled ? undefined : toggle}
         title={disabled ? "Load an event first" : undefined}
@@ -233,9 +233,9 @@ function TeamPromptModal() {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm shadow-2xl">
-        <h3 className="text-lg font-semibold text-white mb-2">Welcome!</h3>
-        <p className="text-sm text-zinc-400 mb-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 w-full max-w-sm shadow-2xl">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Welcome!</h3>
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">
           What&apos;s your FTC team number? This is optional and helps with team sharing features.
         </p>
         <input
@@ -244,11 +244,11 @@ function TeamPromptModal() {
           onChange={(e) => setTeamNum(e.target.value)}
           placeholder="e.g. 21364"
           autoFocus
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
-            font-mono placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] mb-4"
+          className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)]
+            font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)] mb-4"
         />
         <div className="flex gap-2 justify-end">
-          <button onClick={dismissTeamPrompt} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white transition-colors">Skip</button>
+          <button onClick={dismissTeamPrompt} className="px-3 py-1.5 text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors">Skip</button>
           <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-sm bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors disabled:opacity-50">
             {saving ? "Saving..." : "Save"}
           </button>
@@ -265,13 +265,13 @@ function MigrationPromptModal() {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm shadow-2xl">
-        <h3 className="text-lg font-semibold text-white mb-2">Sync Local Data?</h3>
-        <p className="text-sm text-zinc-400 mb-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 w-full max-w-sm shadow-2xl">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Sync Local Data?</h3>
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">
           You have existing scouting data saved in this browser. Would you like to sync it to your account so it&apos;s available on all your devices?
         </p>
         <div className="flex gap-2 justify-end">
-          <button onClick={dismissMigration} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white transition-colors">Keep Local Only</button>
+          <button onClick={dismissMigration} className="px-3 py-1.5 text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors">Keep Local Only</button>
           <button onClick={acceptMigration} className="px-4 py-1.5 text-sm bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors">Sync to Account</button>
         </div>
       </div>
@@ -304,7 +304,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm hover:bg-zinc-800 transition-colors min-h-[40px] ${collapsed ? "justify-center" : ""}`}
+        className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-card-hover)] transition-colors min-h-[40px] ${collapsed ? "justify-center" : ""}`}
       >
         {avatarUrl ? (
           <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full shrink-0" referrerPolicy="no-referrer" />
@@ -317,10 +317,10 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       </button>
 
       {open && (
-        <div className={`absolute ${collapsed ? "left-full ml-2" : "left-0 right-0"} bottom-full mb-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden min-w-[160px]`}>
+        <div className={`absolute ${collapsed ? "left-full ml-2" : "left-0 right-0"} bottom-full mb-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-lg shadow-xl z-50 overflow-hidden min-w-[160px]`}>
           <button
             onClick={() => { setOpen(false); router.push("/profile"); }}
-            className="w-full text-left px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+            className="w-full text-left px-3 py-2.5 text-sm text-[var(--foreground-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--foreground)] transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -329,7 +329,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           </button>
           <button
             onClick={() => { setOpen(false); signOut(); }}
-            className="w-full text-left px-3 py-2.5 text-sm text-zinc-400 hover:bg-zinc-700 hover:text-red-400 transition-colors flex items-center gap-2 border-t border-zinc-700"
+            className="w-full text-left px-3 py-2.5 text-sm text-[var(--foreground-muted)] hover:bg-[var(--bg-card)] hover:text-red-400 transition-colors flex items-center gap-2 border-t border-[var(--border)]"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -351,7 +351,7 @@ function SignInButton({ collapsed }: { collapsed: boolean }) {
   return (
     <button
       onClick={signInWithGoogle}
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors min-h-[40px] ${collapsed ? "justify-center w-full" : "w-full"}`}
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-[var(--foreground-dim)] hover:text-[var(--foreground-muted)] hover:bg-[var(--bg-card-hover)] transition-colors min-h-[40px] ${collapsed ? "justify-center w-full" : "w-full"}`}
       title="Sign in with Google"
     >
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -458,8 +458,8 @@ function NavLink({
     isActive
       ? "bg-[var(--accent-muted)] text-[var(--accent)]"
       : disabled
-        ? "text-zinc-700 cursor-not-allowed"
-        : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+        ? "text-[var(--foreground-dim)] cursor-not-allowed"
+        : "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card-hover)]"
   } ${collapsed ? "justify-center" : ""}`;
 
   if (disabled) {
@@ -584,9 +584,9 @@ function SidebarContent({
               onChange={(e) => setReportQuery(e.target.value)}
               placeholder="Team #"
               autoFocus
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] w-full"
+              className="flex-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-[var(--foreground)] font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)] w-full"
             />
-            <button type="submit" className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors">
+            <button type="submit" className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2 py-1.5 text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:border-[var(--border-hover)] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
@@ -639,7 +639,7 @@ function SidebarContent({
               onNavClick?.();
               window.dispatchEvent(new CustomEvent("plftc:openQuickSwitcher"));
             }}
-            className="w-full flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 active:bg-zinc-700 mb-3"
+            className="w-full flex items-center gap-3 px-3 py-3 min-h-[48px] rounded-lg bg-[var(--bg-card-hover)] border border-[var(--border)] text-[var(--foreground-muted)] active:bg-[var(--border)] mb-3"
           >
             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -694,7 +694,7 @@ function SidebarContent({
 
             return (
               <div key={`${it.href}-${idx}`}>
-                {showDivider && <div className="my-2 border-t border-zinc-800" />}
+                {showDivider && <div className="my-2 border-t border-[var(--border)]" />}
                 {disabled ? (
                   <div className={linkCls} aria-disabled="true">
                     <span className="shrink-0">{it.icon}</span>
@@ -968,16 +968,16 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={`hidden md:flex sticky top-0 h-screen flex-col bg-zinc-900 border-r border-[var(--border)] transition-[width] duration-200 shrink-0 ${collapsed ? "w-16" : "w-60"}`}>
+      <aside className={`hidden md:flex sticky top-0 h-screen flex-col bg-[var(--bg-card)] border-r border-[var(--border)] transition-[width] duration-200 shrink-0 ${collapsed ? "w-16" : "w-60"}`}>
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           {!collapsed && (
-            <h1 className="text-lg font-bold text-white tracking-tight">
+            <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
               Pick<span className="text-[var(--accent)]">List</span>FTC
             </h1>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded-md text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card-hover)] transition-colors"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <svg className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -990,12 +990,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen?: boolean; o
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <aside className="fixed inset-y-0 left-0 z-[60] w-72 flex flex-col bg-zinc-900 border-r border-[var(--border)] shadow-2xl md:hidden">
+        <aside className="fixed inset-y-0 left-0 z-[60] w-72 flex flex-col bg-[var(--bg-card)] border-r border-[var(--border)] shadow-2xl md:hidden">
           <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-            <h1 className="text-lg font-bold text-white tracking-tight">
+            <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
               Pick<span className="text-[var(--accent)]">List</span>FTC
             </h1>
-            <button onClick={onMobileClose} aria-label="Close menu" className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+            <button onClick={onMobileClose} aria-label="Close menu" className="p-2 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card-hover)] transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>

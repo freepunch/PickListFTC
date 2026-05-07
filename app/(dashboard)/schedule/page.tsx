@@ -348,7 +348,7 @@ function WinProbDonut({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgb(63 63 70)" /* zinc-700 */
+          style={{ stroke: "var(--donut-track)" }}
           strokeWidth={6}
         />
         {/* Red arc */}
@@ -680,7 +680,7 @@ function UpcomingDetail({
               {opr.toFixed(1)}
             </span>
           </div>
-          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${
                 alliance === "red" ? "bg-red-500/50" : "bg-blue-500/50"

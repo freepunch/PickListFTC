@@ -19,7 +19,6 @@ interface EventState {
   selectedTeams: number[];
   eventCode: string;
   lastUpdated: number | null;
-  highContrast: boolean;
   isPrescout: boolean;
   prescoutData: PrescoutTeamData[];
   prescoutRanking: PrescoutRankedTeam[];
@@ -33,7 +32,6 @@ interface EventContextValue extends EventState {
   toggleTeamSelection: (teamNumber: number) => void;
   clearSelection: () => void;
   setEventCode: (code: string) => void;
-  setHighContrast: (on: boolean) => void;
   dismissLiveToast: () => void;
 }
 
@@ -99,7 +97,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
     selectedTeams: [],
     eventCode: "",
     lastUpdated: null,
-    highContrast: false,
     isPrescout: false,
     prescoutData: [],
     prescoutRanking: [],
@@ -226,10 +223,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, eventCode: code }));
   }, []);
 
-  const setHighContrast = useCallback((on: boolean) => {
-    setState((prev) => ({ ...prev, highContrast: on }));
-  }, []);
-
   const dismissLiveToast = useCallback(() => {
     setState((prev) => ({ ...prev, showLiveToast: false }));
   }, []);
@@ -243,7 +236,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
         toggleTeamSelection,
         clearSelection,
         setEventCode,
-        setHighContrast,
         dismissLiveToast,
       }}
     >

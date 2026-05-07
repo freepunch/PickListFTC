@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useTheme } from "@/context/ThemeContext";
 import {
   RadarChart,
   PolarGrid,
@@ -205,6 +206,9 @@ function MiniRadar({
   partner: ProcessedTeam;
   allTeams: ProcessedTeam[];
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   const data = useMemo(() => {
     return RADAR_AXES.map((axis) => {
       const normalized = normalizeStats(allTeams, axis.accessor);
@@ -221,10 +225,10 @@ function MiniRadar({
   return (
     <ResponsiveContainer width="100%" height={220}>
       <RadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
-        <PolarGrid stroke="#3f3f46" />
+        <PolarGrid stroke={isDark ? "#3f3f46" : "#e4e4e7"} />
         <PolarAngleAxis
           dataKey="stat"
-          tick={{ fill: "#a1a1aa", fontSize: 11 }}
+          tick={{ fill: "#71717a", fontSize: 11 }}
         />
         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
         <Radar
@@ -245,10 +249,11 @@ function MiniRadar({
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: "#18181b",
-            border: "1px solid #3f3f46",
+            backgroundColor: isDark ? "#18181b" : "#ffffff",
+            border: `1px solid ${isDark ? "#3f3f46" : "#d4d4d8"}`,
             borderRadius: "8px",
             fontSize: "12px",
+            color: isDark ? "#fafafa" : "#09090b",
           }}
         />
       </RadarChart>

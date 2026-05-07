@@ -43,7 +43,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
 
   return (
     <div
-      className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-3 space-y-2.5"
+      className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-xl p-3 space-y-2.5"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Text input */}
@@ -58,7 +58,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
         }}
         placeholder="Observation about this team…"
         rows={2}
-        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)] resize-none"
       />
 
       {/* Predefined tag chips */}
@@ -73,7 +73,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
               className={`px-2 py-0.5 rounded-full text-xs transition-all ${
                 active
                   ? tagColorClass(tag.label)
-                  : "bg-zinc-800 text-zinc-500 border border-zinc-700 hover:border-zinc-500 hover:text-zinc-300"
+                  : "bg-[var(--bg-card-hover)] text-[var(--foreground-dim)] border border-[var(--border)] hover:border-[var(--border-hover)] hover:text-[var(--foreground-muted)]"
               }`}
             >
               {tag.label}
@@ -96,13 +96,13 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
             }
           }}
           placeholder="Custom tag (Enter to add)…"
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+          className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)]"
         />
         <button
           type="button"
           onClick={commitCustomTag}
           disabled={!customInput.trim()}
-          className="px-2.5 py-1 text-xs bg-zinc-700 text-zinc-300 rounded hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-2.5 py-1 text-xs bg-[var(--bg-card-hover)] text-[var(--foreground-muted)] rounded hover:bg-[var(--border)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Add
         </button>
