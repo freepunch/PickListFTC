@@ -35,8 +35,8 @@
   --border: #d4d4d8;
   --border-hover: #a1a1aa;
   --foreground: #09090b;
-  --foreground-muted: #52525b;
-  --foreground-dim: #a1a1aa;
+  --foreground-muted: #3f3f46;
+  --foreground-dim: #71717a;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --accent-muted: rgba(37, 99, 235, 0.12);
@@ -149,6 +149,7 @@ body {
 html.light {
   color-scheme: light;
 
+  /* Backgrounds */
   & .bg-zinc-950 { background-color: var(--bg); }
   & .bg-zinc-900 { background-color: var(--bg-card); }
   & .bg-zinc-800 { background-color: var(--bg-card-hover); }
@@ -156,16 +157,56 @@ html.light {
   & .border-zinc-800 { border-color: var(--border); }
   & .border-zinc-700 { border-color: var(--border); }
 
-  /* zinc-200/300 is near-white — invisible on light backgrounds */
+  /* Text: zinc-200/300 near-white — invisible on light backgrounds */
   & .text-zinc-100,
   & .text-zinc-200 { color: var(--foreground); }
   & .text-zinc-300 { color: var(--foreground-muted); }
+
+  /* Text: zinc-400/500/600 too faint on white — darken to meet WCAG AA */
+  & .text-zinc-400 { color: var(--foreground-muted); }
+  & .text-zinc-500 { color: var(--foreground-dim); }
+  & .text-zinc-600 { color: var(--foreground-dim); }
+
+  /* text-white is dark-mode-only — map to foreground, restore on colored bg */
+  & .text-white { color: var(--foreground); }
+  & .bg-\[var\(--accent\)\] .text-white,
+  & .bg-\[var\(--accent\)\].text-white,
+  & .bg-blue-500 .text-white,
+  & .bg-blue-600 .text-white,
+  & .bg-red-500 .text-white,
+  & .bg-red-600 .text-white,
+  & .bg-green-500 .text-white,
+  & .bg-rose-500 .text-white { color: #ffffff; }
+
+  /* Hover text corrections */
+  & .hover\:text-white:hover { color: var(--foreground); }
+  & .hover\:text-zinc-300:hover { color: var(--foreground-muted); }
+  & .hover\:text-zinc-100:hover { color: var(--foreground); }
+
+  /* Placeholder text */
+  & .placeholder\:text-zinc-500::placeholder,
+  & .placeholder\:text-zinc-600::placeholder { color: var(--foreground-dim); }
+  & .placeholder\:text-zinc-400::placeholder { color: var(--foreground-muted); }
+
+  /* Input / textarea backgrounds that use zinc shades */
+  & input.bg-zinc-800,
+  & input.bg-zinc-900,
+  & textarea.bg-zinc-800,
+  & textarea.bg-zinc-900,
+  & select.bg-zinc-800,
+  & select.bg-zinc-900 {
+    background-color: #ffffff;
+    border-color: var(--border);
+    color: var(--foreground);
+  }
 
   /* Hover and active state corrections */
   & .hover\:bg-zinc-800:hover,
   & .active\:bg-zinc-800:active { background-color: var(--bg-card-hover); }
   & .hover\:bg-zinc-700:hover,
   & .active\:bg-zinc-700:active { background-color: var(--bg-card); }
+  & .hover\:text-zinc-200:hover { color: var(--foreground); }
+  & .hover\:text-zinc-400:hover { color: var(--foreground-muted); }
 
   /* Sidebar: light sidebar needs a right border shadow to separate from content */
   & aside { box-shadow: 1px 0 0 var(--border); }
