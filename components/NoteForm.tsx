@@ -1,19 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PREDEFINED_TAGS, tagColorClass } from "@/lib/notes";
 import { useNotes } from "@/context/NotesContext";
+import { useAuth } from "@/context/AuthContext";
+import { useEvent } from "@/context/EventContext";
+import { useWorkspaceOptional } from "@/context/WorkspaceContext";
+import { addWorkspaceNote } from "@/lib/workspace";
 
 interface NoteFormProps {
   teamNumber: number;
   onClose: () => void;
 }
 
+const SHARE_PREF_KEY = "plftc:noteForm:shareToWorkspace";
+
 export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
   const { addNote } = useNotes();
+  const { user } = useAuth();
+  const { eventCode } = useEvent();
+  const ws = useWorkspaceOptional();
   const [text, setText] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState("");
+  const [shareToWorkspace, setShareToWorkspace] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(SHARE_PREF_KEY);
+      if (v === "1") setShareToWorkspace(true);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHARE_PREF_KEY, shareToWorkspace ? "1" : "0");
+    } catch {}
+  }, [shareToWorkspace]);
 
   const toggleTag = (label: string) => {
     setSelectedTags((prev) =>
@@ -32,8 +54,20 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
   const handleSave = () => {
     if (!text.trim() && selectedTags.length === 0) return;
     addNote(teamNumber, text, selectedTags);
+    if (shareToWorkspace && ws?.workspace && user && eventCode) {
+      addWorkspaceNote(
+        ws.workspace.id,
+        user.id,
+        eventCode,
+        teamNumber,
+        text.trim(),
+        selectedTags
+      ).then(() => ws.refreshNotes());
+    }
     onClose();
   };
+
+  const canShareToWorkspace = !!ws?.workspace && !!user && !!eventCode;
 
   const customTags = selectedTags.filter(
     (t) => !PREDEFINED_TAGS.some((p) => p.label === t)
@@ -127,6 +161,22 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
             </span>
           ))}
         </div>
+      )}
+
+      {/* Workspace share toggle */}
+      {canShareToWorkspace && (
+        <label className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={shareToWorkspace}
+            onChange={(e) => setShareToWorkspace(e.target.checked)}
+            className="accent-[var(--accent)]"
+          />
+          <span>
+            Share to workspace
+            <span className="text-[var(--foreground-dim)]"> · {ws!.workspace!.name}</span>
+          </span>
+        </label>
       )}
 
       {/* Action buttons */}

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNotes } from "@/context/NotesContext";
 import { useAuth } from "@/context/AuthContext";
+import { useEvent } from "@/context/EventContext";
+import { useWorkspaceOptional } from "@/context/WorkspaceContext";
 import { tagColorClass } from "@/lib/notes";
 
 interface NotesBadgeProps {
@@ -15,6 +17,8 @@ interface NotesBadgeProps {
 export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) {
   const { notesForTeam, sharedNotesForTeam, deleteNote, toggleNoteShared } = useNotes();
   const { user, profile } = useAuth();
+  const { eventCode } = useEvent();
+  const ws = useWorkspaceOptional();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [isMobile, setIsMobile] = useState(false);
@@ -22,7 +26,13 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
   const popoverRef = useRef<HTMLDivElement>(null);
   const teamNotes = notesForTeam(teamNumber);
   const shared = sharedNotesForTeam(teamNumber);
-  const allNotes = [...teamNotes, ...shared];
+  const workspaceNotes = (ws?.notes ?? []).filter(
+    (n) =>
+      n.team_number === teamNumber &&
+      n.event_code === eventCode &&
+      n.author_id !== user?.id
+  );
+  const allNotes = [...teamNotes, ...shared, ...workspaceNotes];
   const isLoggedIn = !!user;
   const hasTeam = !!profile?.team_number;
 
@@ -180,6 +190,54 @@ export function NotesBadge({ teamNumber, allowDelete = true }: NotesBadgeProps) 
                   </div>
                 </div>
               ))}
+
+              {/* Workspace notes from other members */}
+              {workspaceNotes.length > 0 && (
+                <>
+                  {teamNotes.length > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/30">
+                      <div className="flex-1 h-px bg-zinc-800" />
+                      <span className="text-[10px] text-teal-400/80 font-medium shrink-0">
+                        Workspace
+                      </span>
+                      <div className="flex-1 h-px bg-zinc-800" />
+                    </div>
+                  )}
+                  {workspaceNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="px-3 py-2.5 border-b border-zinc-800/50 last:border-0 border-l-2 border-l-teal-400/50"
+                    >
+                      {note.text && (
+                        <p className="text-xs text-zinc-200 mb-1.5 leading-relaxed">
+                          {note.text}
+                        </p>
+                      )}
+                      {note.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {note.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full ${tagColorClass(tag)}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[10px] text-teal-400/80">
+                        {note.authorName ?? "Member"} &middot;{" "}
+                        {new Date(note.created_at).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              )}
 
               {/* Shared teammate notes */}
               {shared.length > 0 && (
