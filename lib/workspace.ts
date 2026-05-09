@@ -191,7 +191,7 @@ export async function lookupInvite(code: string): Promise<InviteLookup | null> {
   const cleaned = code.trim().toUpperCase();
   if (!cleaned) return null;
   const { data, error } = await supabase.rpc("lookup_workspace_by_invite", {
-    p_code: cleaned,
+    invite_code_input: cleaned,
   });
   if (error || !data) return null;
   const row = Array.isArray(data) ? data[0] : data;

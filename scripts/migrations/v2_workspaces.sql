@@ -159,7 +159,7 @@ CREATE POLICY "Members write activity" ON workspace_activity FOR INSERT
   );
 
 -- Public read for invite-code lookups on the /join/[code] page.
-CREATE OR REPLACE FUNCTION public.lookup_workspace_by_invite(p_code TEXT)
+CREATE OR REPLACE FUNCTION public.lookup_workspace_by_invite(invite_code_input TEXT)
 RETURNS TABLE (
   id UUID,
   name TEXT,
@@ -180,7 +180,7 @@ AS $$
     w.invite_disabled,
     (SELECT count(*) FROM workspace_members m WHERE m.workspace_id = w.id) AS member_count
   FROM workspaces w
-  WHERE w.invite_code = upper(p_code) AND w.paid = true
+  WHERE w.invite_code = upper(invite_code_input) AND w.paid = true
   LIMIT 1;
 $$;
 
