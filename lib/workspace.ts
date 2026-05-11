@@ -547,17 +547,23 @@ export async function savePersonalRanking(
   pickListId: string,
   userId: string,
   rankedTeams: number[]
-): Promise<void> {
-  await supabase.from("workspace_personal_rankings").upsert(
-    {
-      workspace_id: workspaceId,
-      pick_list_id: pickListId,
-      user_id: userId,
-      ranked_teams: rankedTeams,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "pick_list_id,user_id" }
-  );
+): Promise<{ error: string | null }> {
+  console.log("[CONSENSUS] savePersonalRanking:", { workspaceId, pickListId, userId, rankedTeams });
+  const { data, error } = await supabase
+    .from("workspace_personal_rankings")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        pick_list_id: pickListId,
+        user_id: userId,
+        ranked_teams: rankedTeams,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "pick_list_id,user_id" }
+    )
+    .select();
+  console.log("[CONSENSUS] upsert result:", { data, error });
+  return { error: error?.message ?? null };
 }
 
 // ── Activity feed ──────────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ export function ConsensusView({ list, onApplied }: Props) {
   const [myRanking, setMyRanking] = useState<number[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [activePanel, setActivePanel] = useState<"consensus" | "mine">("consensus");
 
@@ -132,10 +133,20 @@ export function ConsensusView({ list, onApplied }: Props) {
     setIsDirty(true);
   };
 
+  const hasMySubmission = rankings.some((r) => r.user_id === user?.id);
+
   const handleSave = async () => {
     if (!user || !workspace) return;
+    console.log("[CONSENSUS] handleSave fired:", { userId: user.id, pickListId: list.id, myRanking });
     setSaving(true);
-    await savePersonalRanking(workspace.id, list.id, user.id, myRanking);
+    setSaveError(null);
+    const { error } = await savePersonalRanking(workspace.id, list.id, user.id, myRanking);
+    if (error) {
+      console.error("[CONSENSUS] Save failed:", error);
+      setSaveError(error);
+      setSaving(false);
+      return;
+    }
     isDirtyRef.current = false;
     setIsDirty(false);
     setSaving(false);
@@ -340,17 +351,22 @@ export function ConsensusView({ list, onApplied }: Props) {
               </ul>
             )}
           </div>
-          <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 flex items-center justify-between gap-2">
-            <p className="text-[11px] text-[var(--foreground-dim)]">
-              {submittedCount} of {totalMembers} member{totalMembers !== 1 ? "s" : ""} submitted
-            </p>
-            <button
-              onClick={handleSave}
-              disabled={saving || !isDirty}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving…" : "Save my ranking"}
-            </button>
+          <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 space-y-2">
+            {saveError && (
+              <p className="text-[11px] text-red-400 text-right">{saveError}</p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-[var(--foreground-dim)]">
+                {submittedCount} of {totalMembers} member{totalMembers !== 1 ? "s" : ""} submitted
+              </p>
+              <button
+                onClick={handleSave}
+                disabled={saving || (hasMySubmission && !isDirty)}
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving…" : hasMySubmission ? "Update my ranking" : "Submit my ranking"}
+              </button>
+            </div>
           </div>
         </div>
       )}
