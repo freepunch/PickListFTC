@@ -259,3 +259,36 @@ CREATE POLICY "Members update own assignments" ON workspace_scouting_assignments
     workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
     AND (assigned_to = auth.uid() OR assigned_to IS NULL)
   );
+
+-- ── Draft board ───────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_drafts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  num_alliances INT NOT NULL DEFAULT 4,
+  ranking_order JSONB NOT NULL DEFAULT '[]',
+  picks JSONB NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'setup', -- 'setup', 'active', 'complete'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_drafts_ws_event_idx
+  ON workspace_drafts (workspace_id, event_code);
+
+ALTER TABLE workspace_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read drafts" ON workspace_drafts;
+CREATE POLICY "Members read drafts" ON workspace_drafts FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors write drafts" ON workspace_drafts;
+CREATE POLICY "Editors write drafts" ON workspace_drafts FOR ALL
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );

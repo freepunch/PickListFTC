@@ -508,6 +508,104 @@ export async function updateSuggestionStatus(
     .eq("id", suggestionId);
 }
 
+// ── Draft board ────────────────────────────────────────────────────────────
+
+export type DraftStatus = "setup" | "active" | "complete";
+
+export interface DraftPick {
+  alliance: number; // 1-indexed
+  round: number; // 1-indexed
+  teamNumber: number;
+}
+
+export interface WorkspaceDraft {
+  id: string;
+  workspace_id: string;
+  event_code: string;
+  num_alliances: number;
+  ranking_order: number[];
+  picks: DraftPick[];
+  status: DraftStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export const PICKS_PER_ALLIANCE = 2;
+
+export function getDraftPickSlot(
+  numAlliances: number,
+  pickCount: number,
+  picksPerAlliance: number = PICKS_PER_ALLIANCE
+): { alliance: number; round: number; total: number } | null {
+  const total = numAlliances * picksPerAlliance;
+  if (pickCount >= total) return null;
+  const round = Math.floor(pickCount / numAlliances) + 1;
+  const pos = pickCount % numAlliances;
+  // Serpentine: odd rounds 1→N, even rounds N→1
+  const alliance = round % 2 === 1 ? pos + 1 : numAlliances - pos;
+  return { alliance, round, total };
+}
+
+export async function loadDraft(
+  workspaceId: string,
+  eventCode: string
+): Promise<WorkspaceDraft | null> {
+  const { data, error } = await supabase
+    .from("workspace_drafts")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("event_code", eventCode)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    workspace_id: data.workspace_id,
+    event_code: data.event_code,
+    num_alliances: data.num_alliances,
+    ranking_order: (data.ranking_order ?? []) as number[],
+    picks: (data.picks ?? []) as DraftPick[],
+    status: data.status as DraftStatus,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
+}
+
+export async function upsertDraft(args: {
+  workspaceId: string;
+  eventCode: string;
+  num_alliances?: number;
+  ranking_order?: number[];
+  picks?: DraftPick[];
+  status?: DraftStatus;
+}): Promise<{ error: string | null }> {
+  const payload: Record<string, unknown> = {
+    workspace_id: args.workspaceId,
+    event_code: args.eventCode,
+    updated_at: new Date().toISOString(),
+  };
+  if (args.num_alliances !== undefined) payload.num_alliances = args.num_alliances;
+  if (args.ranking_order !== undefined) payload.ranking_order = args.ranking_order;
+  if (args.picks !== undefined) payload.picks = args.picks;
+  if (args.status !== undefined) payload.status = args.status;
+
+  const { error } = await supabase
+    .from("workspace_drafts")
+    .upsert(payload, { onConflict: "workspace_id,event_code" });
+  if (error) console.error("[DRAFT] upsert failed:", error);
+  return { error: error?.message ?? null };
+}
+
+export async function deleteDraft(
+  workspaceId: string,
+  eventCode: string
+): Promise<void> {
+  await supabase
+    .from("workspace_drafts")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("event_code", eventCode);
+}
+
 // ── Scouting assignments ───────────────────────────────────────────────────
 
 export type ScoutingStatus = "unscouted" | "assigned" | "in_progress" | "scouted";
