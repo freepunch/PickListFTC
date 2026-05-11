@@ -508,6 +508,102 @@ export async function updateSuggestionStatus(
     .eq("id", suggestionId);
 }
 
+// ── Scouting assignments ───────────────────────────────────────────────────
+
+export type ScoutingStatus = "unscouted" | "assigned" | "in_progress" | "scouted";
+
+export interface ScoutingAssignment {
+  id: string;
+  workspace_id: string;
+  event_code: string;
+  team_number: number;
+  assigned_to: string | null;
+  status: ScoutingStatus;
+  updated_at: string;
+  assignedToName?: string | null;
+}
+
+export async function loadAssignments(
+  workspaceId: string,
+  eventCode: string
+): Promise<ScoutingAssignment[]> {
+  const { data, error } = await supabase
+    .from("workspace_scouting_assignments")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("event_code", eventCode);
+  if (error || !data) return [];
+
+  const ids = Array.from(
+    new Set(data.map((r) => r.assigned_to).filter(Boolean) as string[])
+  );
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nameMap = new Map(
+    (profiles ?? []).map((p) => [
+      p.id as string,
+      (p as { display_name: string | null }).display_name,
+    ])
+  );
+
+  return data.map((row) => ({
+    id: row.id,
+    workspace_id: row.workspace_id,
+    event_code: row.event_code,
+    team_number: row.team_number,
+    assigned_to: row.assigned_to,
+    status: row.status as ScoutingStatus,
+    updated_at: row.updated_at,
+    assignedToName: row.assigned_to ? nameMap.get(row.assigned_to) ?? null : null,
+  }));
+}
+
+export async function upsertAssignment(
+  workspaceId: string,
+  eventCode: string,
+  teamNumber: number,
+  status: ScoutingStatus,
+  assignedTo: string | null
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("workspace_scouting_assignments")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        event_code: eventCode,
+        team_number: teamNumber,
+        status,
+        assigned_to: assignedTo,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "workspace_id,event_code,team_number" }
+    );
+  return { error: error?.message ?? null };
+}
+
+export async function initializeAssignments(
+  workspaceId: string,
+  eventCode: string,
+  teamNumbers: number[]
+): Promise<void> {
+  if (!teamNumbers.length) return;
+  await supabase
+    .from("workspace_scouting_assignments")
+    .upsert(
+      teamNumbers.map((tn) => ({
+        workspace_id: workspaceId,
+        event_code: eventCode,
+        team_number: tn,
+        status: "unscouted" as ScoutingStatus,
+        assigned_to: null,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: "workspace_id,event_code,team_number", ignoreDuplicates: true }
+    );
+}
+
 // ── Personal rankings ─────────────────────────────────────────────────────
 
 export async function loadPersonalRankings(

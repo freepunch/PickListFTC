@@ -217,3 +217,45 @@ CREATE POLICY "Members insert own rankings" ON workspace_personal_rankings FOR I
 DROP POLICY IF EXISTS "Members update own rankings" ON workspace_personal_rankings;
 CREATE POLICY "Members update own rankings" ON workspace_personal_rankings FOR UPDATE
   USING (user_id = auth.uid());
+
+-- ── Scouting assignments ──────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_scouting_assignments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  team_number INT NOT NULL,
+  assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'unscouted', -- 'unscouted', 'assigned', 'in_progress', 'scouted'
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code, team_number)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_scouting_ws_event_idx
+  ON workspace_scouting_assignments (workspace_id, event_code);
+
+ALTER TABLE workspace_scouting_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members read assignments" ON workspace_scouting_assignments FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Members insert assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members insert assignments" ON workspace_scouting_assignments FOR INSERT
+  WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors update assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Editors update assignments" ON workspace_scouting_assignments FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Members update own assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members update own assignments" ON workspace_scouting_assignments FOR UPDATE
+  USING (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND (assigned_to = auth.uid() OR assigned_to IS NULL)
+  );

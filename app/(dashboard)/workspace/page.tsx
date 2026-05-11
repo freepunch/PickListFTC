@@ -11,8 +11,9 @@ import { NotesTab } from "./_components/NotesTab";
 import { PickListsTab } from "./_components/PickListsTab";
 import { MembersTab } from "./_components/MembersTab";
 import { AdminSettingsModal } from "./_components/AdminSettingsModal";
+import { ScoutingBoard } from "./_components/ScoutingBoard";
 
-type TabId = "overview" | "notes" | "picklists" | "members";
+type TabId = "overview" | "notes" | "picklists" | "members" | "scouting";
 
 export default function WorkspacePage() {
   const { user, loading: authLoading } = useAuth();
@@ -105,6 +106,7 @@ export default function WorkspacePage() {
               badge: pendingSuggestions.length || undefined,
             },
             { id: "members", label: "Members" },
+            { id: "scouting", label: "Scouting" },
           ] as { id: TabId; label: string; badge?: number }[]
         ).map((t) => (
           <button
@@ -126,11 +128,12 @@ export default function WorkspacePage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className={tab === "scouting" ? "flex-1 min-h-0 overflow-hidden" : "flex-1 overflow-y-auto"}>
         {tab === "overview" && <OverviewTab />}
         {tab === "notes" && <NotesTab />}
         {tab === "picklists" && <PickListsTab />}
         {tab === "members" && <MembersTab />}
+        {tab === "scouting" && <ScoutingBoard />}
       </div>
 
       {showSettings && (
