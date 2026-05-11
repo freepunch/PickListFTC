@@ -191,15 +191,15 @@ GRANT EXECUTE ON FUNCTION public.lookup_workspace_by_invite(TEXT) TO anon, authe
 CREATE TABLE IF NOT EXISTS workspace_personal_rankings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
-  pick_list_id UUID REFERENCES workspace_pick_lists(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  ranked_teams JSONB NOT NULL DEFAULT '[]', -- ordered array of teamNumbers
+  rankings JSONB NOT NULL DEFAULT '[]', -- ordered array of teamNumbers
   updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(pick_list_id, user_id)
+  UNIQUE(workspace_id, event_code, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS workspace_personal_rankings_pl_idx
-  ON workspace_personal_rankings (pick_list_id);
+CREATE INDEX IF NOT EXISTS workspace_personal_rankings_ws_event_idx
+  ON workspace_personal_rankings (workspace_id, event_code);
 
 ALTER TABLE workspace_personal_rankings ENABLE ROW LEVEL SECURITY;
 

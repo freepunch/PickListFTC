@@ -79,9 +79,9 @@ export interface WorkspaceSuggestion {
 export interface WorkspacePersonalRanking {
   id: string;
   workspace_id: string;
-  pick_list_id: string;
+  event_code: string;
   user_id: string;
-  ranked_teams: number[];
+  rankings: number[];
   updated_at: string;
   memberName?: string | null;
 }
@@ -607,12 +607,14 @@ export async function initializeAssignments(
 // ── Personal rankings ─────────────────────────────────────────────────────
 
 export async function loadPersonalRankings(
-  pickListId: string
+  workspaceId: string,
+  eventCode: string
 ): Promise<WorkspacePersonalRanking[]> {
   const { data, error } = await supabase
     .from("workspace_personal_rankings")
     .select("*")
-    .eq("pick_list_id", pickListId);
+    .eq("workspace_id", workspaceId)
+    .eq("event_code", eventCode);
   if (error || !data) return [];
 
   const ids = Array.from(new Set(data.map((r) => r.user_id)));
@@ -630,9 +632,9 @@ export async function loadPersonalRankings(
   return data.map((row) => ({
     id: row.id,
     workspace_id: row.workspace_id,
-    pick_list_id: row.pick_list_id,
+    event_code: row.event_code,
     user_id: row.user_id,
-    ranked_teams: row.ranked_teams as number[],
+    rankings: row.rankings as number[],
     updated_at: row.updated_at,
     memberName: nameMap.get(row.user_id) ?? null,
   }));
@@ -640,24 +642,25 @@ export async function loadPersonalRankings(
 
 export async function savePersonalRanking(
   workspaceId: string,
-  pickListId: string,
+  eventCode: string,
   userId: string,
-  rankedTeams: number[]
+  rankings: number[]
 ): Promise<{ error: string | null }> {
-  console.log("[CONSENSUS] savePersonalRanking:", { workspaceId, pickListId, userId, rankedTeams });
+  console.log("[CONSENSUS] savePersonalRanking:", { workspaceId, eventCode, userId, rankings });
   const { data, error } = await supabase
     .from("workspace_personal_rankings")
     .upsert(
       {
         workspace_id: workspaceId,
-        pick_list_id: pickListId,
+        event_code: eventCode,
         user_id: userId,
-        ranked_teams: rankedTeams,
+        rankings,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "pick_list_id,user_id" }
+      { onConflict: "workspace_id,event_code,user_id" }
     )
     .select();
+  if (error) console.error("[CONSENSUS] Submit failed:", error);
   console.log("[CONSENSUS] upsert result:", { data, error });
   return { error: error?.message ?? null };
 }

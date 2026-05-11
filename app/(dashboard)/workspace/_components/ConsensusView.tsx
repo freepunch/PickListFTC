@@ -46,21 +46,22 @@ export function ConsensusView({ list, onApplied }: Props) {
   const N = entries.length;
 
   const loadRankings = useCallback(async () => {
-    const r = await loadPersonalRankings(list.id);
+    if (!workspace) return [];
+    const r = await loadPersonalRankings(workspace.id, list.event_code);
     setRankings(r);
     return r;
-  }, [list.id]);
+  }, [workspace, list.event_code]);
 
   // Initial load
   useEffect(() => {
     loadRankings().then((r) => {
       if (!user) return;
       const mine = r.find((x) => x.user_id === user.id);
-      const base = mine?.ranked_teams ?? entryNums;
+      const base = mine?.rankings ?? entryNums;
       setMyRanking(syncToEntries(base, entryNums));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.id, user?.id]);
+  }, [list.event_code, workspace?.id, user?.id]);
 
   // Sync myRanking when entries change (teams added/removed from pick list)
   useEffect(() => {
@@ -70,22 +71,25 @@ export function ConsensusView({ list, onApplied }: Props) {
 
   // Realtime subscription
   useEffect(() => {
+    if (!workspace) return;
     const ch = supabase
-      .channel(`ws-rankings:${list.id}`)
+      .channel(`ws-rankings:${workspace.id}:${list.event_code}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "workspace_personal_rankings",
-          filter: `pick_list_id=eq.${list.id}`,
+          filter: `workspace_id=eq.${workspace.id}`,
         },
-        () => {
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { event_code?: string } | undefined;
+          if (row?.event_code && row.event_code !== list.event_code) return;
           loadRankings().then((r) => {
             if (!user || isDirtyRef.current) return;
             const mine = r.find((x) => x.user_id === user.id);
             if (mine) {
-              setMyRanking(syncToEntries(mine.ranked_teams, entryNums));
+              setMyRanking(syncToEntries(mine.rankings, entryNums));
             }
           });
         }
@@ -93,7 +97,7 @@ export function ConsensusView({ list, onApplied }: Props) {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.id]);
+  }, [workspace?.id, list.event_code]);
 
   // Consensus calculation
   const consensusData = useMemo(() => {
@@ -109,7 +113,7 @@ export function ConsensusView({ list, onApplied }: Props) {
     }
     const mapped = entries.map((entry) => {
       const memberRanks = rankings.map((r) => {
-        const idx = r.ranked_teams.indexOf(entry.teamNumber);
+        const idx = r.rankings.indexOf(entry.teamNumber);
         return {
           name: r.memberName ?? "Member",
           rank: idx >= 0 ? idx + 1 : N + 1,
@@ -140,7 +144,7 @@ export function ConsensusView({ list, onApplied }: Props) {
     console.log("[CONSENSUS] handleSave fired:", { userId: user.id, pickListId: list.id, myRanking });
     setSaving(true);
     setSaveError(null);
-    const { error } = await savePersonalRanking(workspace.id, list.id, user.id, myRanking);
+    const { error } = await savePersonalRanking(workspace.id, list.event_code, user.id, myRanking);
     if (error) {
       console.error("[CONSENSUS] Save failed:", error);
       setSaveError(error);
