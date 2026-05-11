@@ -292,3 +292,62 @@ CREATE POLICY "Editors write drafts" ON workspace_drafts FOR ALL
       WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
     )
   );
+
+-- ── Match assignments ─────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_match_assignments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  match_id TEXT NOT NULL,
+  assigned_to UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'assigned', -- 'assigned', 'completed'
+  report TEXT,
+  confidence TEXT, -- 'high', 'medium', 'low'
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code, match_id, assigned_to)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_match_assignments_ws_event_idx
+  ON workspace_match_assignments (workspace_id, event_code);
+
+ALTER TABLE workspace_match_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read match assignments" ON workspace_match_assignments;
+CREATE POLICY "Members read match assignments" ON workspace_match_assignments FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors insert match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors insert match assignments" ON workspace_match_assignments FOR INSERT
+  WITH CHECK (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Editors update match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors update match assignments" ON workspace_match_assignments FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Assigned member submit report" ON workspace_match_assignments;
+CREATE POLICY "Assigned member submit report" ON workspace_match_assignments FOR UPDATE
+  USING (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND assigned_to = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Editors delete match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors delete match assignments" ON workspace_match_assignments FOR DELETE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );

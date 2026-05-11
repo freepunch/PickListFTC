@@ -2,18 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useEvent } from "@/context/EventContext";
 import {
   describeActivity,
   formatRelative,
   loadActivity,
   loadWorkspacePickLists,
+  loadMatchAssignments,
   WorkspaceActivity,
+  MatchAssignment,
 } from "@/lib/workspace";
 
 export function OverviewTab() {
   const { workspace, members, notes } = useWorkspace();
+  const { event } = useEvent();
   const [activity, setActivity] = useState<WorkspaceActivity[]>([]);
   const [pickListEvents, setPickListEvents] = useState<number>(0);
+  const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]);
   const [copyToast, setCopyToast] = useState(false);
 
   useEffect(() => {
@@ -23,6 +28,11 @@ export function OverviewTab() {
       setPickListEvents(lists.length)
     );
   }, [workspace]);
+
+  useEffect(() => {
+    if (!workspace || !event) { setMatchAssignments([]); return; }
+    loadMatchAssignments(workspace.id, event.code).then(setMatchAssignments);
+  }, [workspace, event]);
 
   if (!workspace) return null;
 
@@ -52,6 +62,64 @@ export function OverviewTab() {
           value={`${workspace.season}-${(workspace.season + 1).toString().slice(-2)}`}
         />
       </div>
+
+      {event && matchAssignments.length > 0 && (() => {
+        const total = matchAssignments.length;
+        const reported = matchAssignments.filter((a) => a.status === "completed").length;
+        const assigned = total - reported;
+        const unassignedMatches = event.matches
+          ? event.matches
+              .filter((m) => !m.hasBeenPlayed)
+              .filter((m) => !matchAssignments.some((a) => a.match_id === String(m.id)))
+              .slice(0, 5)
+          : [];
+        return (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-6">
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">
+              Match Coverage · <span className="font-mono text-[var(--foreground-dim)]">{event.code}</span>
+            </h3>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="text-center">
+                <p className="text-xl font-bold font-mono text-[var(--foreground)]">{total}</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)]">Assigned</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xl font-bold font-mono text-emerald-400">{reported}</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)]">Reported</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xl font-bold font-mono text-[var(--foreground-muted)]">{assigned}</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)]">Pending</p>
+              </div>
+            </div>
+            {total > 0 && (
+              <div className="h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${Math.round((reported / total) * 100)}%` }}
+                />
+              </div>
+            )}
+            {unassignedMatches.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)] mb-1">
+                  Upcoming without scout
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {unassignedMatches.map((m) => (
+                    <span
+                      key={m.id}
+                      className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                    >
+                      {m.description ?? `#${m.matchNum}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-2">

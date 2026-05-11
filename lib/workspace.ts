@@ -815,6 +815,96 @@ export async function loadActivity(
   }));
 }
 
+// ── Match assignments ──────────────────────────────────────────────────────
+
+export type MatchAssignmentStatus = "assigned" | "completed";
+export type MatchAssignmentConfidence = "high" | "medium" | "low";
+
+export interface MatchAssignment {
+  id: string;
+  workspace_id: string;
+  event_code: string;
+  match_id: string;
+  assigned_to: string;
+  status: MatchAssignmentStatus;
+  report: string | null;
+  confidence: MatchAssignmentConfidence | null;
+  completed_at: string | null;
+  created_at: string;
+  assignedToName?: string | null;
+}
+
+export async function loadMatchAssignments(
+  workspaceId: string,
+  eventCode: string
+): Promise<MatchAssignment[]> {
+  const { data, error } = await supabase
+    .from("workspace_match_assignments")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("event_code", eventCode)
+    .order("created_at", { ascending: true });
+  if (error || !data) return [];
+
+  const ids = Array.from(new Set(data.map((r) => r.assigned_to).filter(Boolean) as string[]));
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nameMap = new Map(
+    (profiles ?? []).map((p) => [
+      p.id as string,
+      (p as { display_name: string | null }).display_name,
+    ])
+  );
+
+  return data.map((row) => ({
+    id: row.id,
+    workspace_id: row.workspace_id,
+    event_code: row.event_code,
+    match_id: row.match_id,
+    assigned_to: row.assigned_to,
+    status: row.status as MatchAssignmentStatus,
+    report: row.report ?? null,
+    confidence: (row.confidence ?? null) as MatchAssignmentConfidence | null,
+    completed_at: row.completed_at ?? null,
+    created_at: row.created_at,
+    assignedToName: nameMap.get(row.assigned_to) ?? null,
+  }));
+}
+
+export async function upsertMatchAssignment(args: {
+  workspaceId: string;
+  eventCode: string;
+  matchId: string;
+  assignedTo: string;
+  status?: MatchAssignmentStatus;
+  report?: string;
+  confidence?: MatchAssignmentConfidence | null;
+}): Promise<{ error: string | null }> {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("workspace_match_assignments")
+    .upsert(
+      {
+        workspace_id: args.workspaceId,
+        event_code: args.eventCode,
+        match_id: args.matchId,
+        assigned_to: args.assignedTo,
+        status: args.status ?? "assigned",
+        report: args.report ?? null,
+        confidence: args.confidence ?? null,
+        completed_at: args.status === "completed" ? now : null,
+      },
+      { onConflict: "workspace_id,event_code,match_id,assigned_to" }
+    );
+  return { error: error?.message ?? null };
+}
+
+export async function deleteMatchAssignment(id: string): Promise<void> {
+  await supabase.from("workspace_match_assignments").delete().eq("id", id);
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function describeActivity(a: WorkspaceActivity): string {

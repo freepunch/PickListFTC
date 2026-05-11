@@ -4,11 +4,20 @@ import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
+import { useWorkspaceOptional } from "@/context/WorkspaceContext";
+import { supabase } from "@/lib/supabase";
 import { EventLoader } from "@/components/EventLoader";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
 import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
 import type { Match } from "@/lib/types";
+import {
+  MatchAssignment,
+  MatchAssignmentConfidence,
+  loadMatchAssignments,
+  upsertMatchAssignment,
+  deleteMatchAssignment,
+} from "@/lib/workspace";
 
 // ── Win probability ──
 const WIN_K = 20 / Math.log(0.85 / 0.15);
@@ -1415,7 +1424,8 @@ export default function SchedulePage() {
     prescoutLoading,
     prescoutData,
   } = useEvent();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const ws = useWorkspaceOptional();
 
   // My team state
   const [myTeam, setMyTeam] = useState<number | null>(null);
@@ -1457,6 +1467,41 @@ export default function SchedulePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [filterDefaulted, setFilterDefaulted] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
+
+  // Match assignments (workspace feature)
+  const [assignments, setAssignments] = useState<MatchAssignment[]>([]);
+
+  useEffect(() => {
+    if (!ws?.workspace || !event) { setAssignments([]); return; }
+    loadMatchAssignments(ws.workspace.id, event.code).then(setAssignments);
+  }, [ws?.workspace, event]);
+
+  useEffect(() => {
+    if (!ws?.workspace || !event) return;
+    const ch = supabase
+      .channel(`ws-match-assign:${ws.workspace.id}:${event.code}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "workspace_match_assignments",
+          filter: `workspace_id=eq.${ws.workspace.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { event_code?: string } | undefined;
+          if (row?.event_code && row.event_code !== event.code) return;
+          loadMatchAssignments(ws.workspace!.id, event.code).then(setAssignments);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [ws?.workspace, event]);
+
+  const assignmentsByMatch = useMemo(
+    () => new Map(assignments.map((a) => [a.match_id, a])),
+    [assignments]
+  );
 
   // Default to "mine" once we have a team and matches
   useEffect(() => {
@@ -2293,11 +2338,21 @@ export default function SchedulePage() {
                                         {predictionCorrect ? "✓" : "✗"}
                                       </span>
                                     )}
+                                    {ws?.workspace && (() => {
+                                      const a = assignmentsByMatch.get(String(m.id));
+                                      if (!a) return null;
+                                      return (
+                                        <span className={`text-[10px] tabular-nums mt-0.5 ${a.status === "completed" ? "text-emerald-500/80" : "text-[var(--accent)]/80"}`}>
+                                          {a.status === "completed" ? "✓ Scouted" : `👁 ${a.assignedToName ?? "Assigned"}`}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
                                 </td>
                               </tr>
                               {isExpanded && (() => {
                                 const ctx = getSeriesContext(m);
+                                const assignment = assignmentsByMatch.get(String(m.id));
                                 return (
                                   <tr className="bg-zinc-800/20 border-b border-zinc-800/50">
                                     <td colSpan={5} className="px-5 py-4">
@@ -2313,6 +2368,22 @@ export default function SchedulePage() {
                                         seriesScore={ctx.seriesScore}
                                         priorSeriesMatch={ctx.priorMatch}
                                       />
+                                      {ws?.workspace && (
+                                        <MatchScoutingSection
+                                          matchId={String(m.id)}
+                                          matchLabel={m.label}
+                                          workspaceId={ws.workspace.id}
+                                          eventCode={event!.code}
+                                          assignment={assignment ?? null}
+                                          members={ws.members}
+                                          role={ws.role}
+                                          userId={user?.id ?? null}
+                                          played={m.played}
+                                          onChanged={() =>
+                                            loadMatchAssignments(ws.workspace!.id, event!.code).then(setAssignments)
+                                          }
+                                        />
+                                      )}
                                     </td>
                                   </tr>
                                 );
@@ -2404,6 +2475,15 @@ export default function SchedulePage() {
                                   {predictionCorrect ? "✓" : "✗"}
                                 </span>
                               )}
+                              {ws?.workspace && (() => {
+                                const a = assignmentsByMatch.get(String(m.id));
+                                if (!a) return null;
+                                return (
+                                  <span className={`text-[10px] ${a.status === "completed" ? "text-emerald-500/80" : "text-[var(--accent)]/80"}`}>
+                                    {a.status === "completed" ? "✓ Scouted" : `👁 ${a.assignedToName ?? "Assigned"}`}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <ScoreDisplay m={m} myTeam={myTeam} />
                           </div>
@@ -2465,6 +2545,7 @@ export default function SchedulePage() {
 
                         {isExpanded && (() => {
                           const ctx = getSeriesContext(m);
+                          const assignment = assignmentsByMatch.get(String(m.id));
                           return (
                             <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-4">
                               <BattleCard
@@ -2479,6 +2560,22 @@ export default function SchedulePage() {
                                 seriesScore={ctx.seriesScore}
                                 priorSeriesMatch={ctx.priorMatch}
                               />
+                              {ws?.workspace && (
+                                <MatchScoutingSection
+                                  matchId={String(m.id)}
+                                  matchLabel={m.label}
+                                  workspaceId={ws.workspace.id}
+                                  eventCode={event!.code}
+                                  assignment={assignment ?? null}
+                                  members={ws.members}
+                                  role={ws.role}
+                                  userId={user?.id ?? null}
+                                  played={m.played}
+                                  onChanged={() =>
+                                    loadMatchAssignments(ws.workspace!.id, event!.code).then(setAssignments)
+                                  }
+                                />
+                              )}
                             </div>
                           );
                         })()}
@@ -2492,6 +2589,248 @@ export default function SchedulePage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Match scouting section (shown in expanded match panel) ─────────────────
+
+import type { WorkspaceMember, WorkspaceRole } from "@/lib/workspace";
+
+function MatchScoutingSection({
+  matchId,
+  matchLabel,
+  workspaceId,
+  eventCode,
+  assignment,
+  members,
+  role,
+  userId,
+  played,
+  onChanged,
+}: {
+  matchId: string;
+  matchLabel: string;
+  workspaceId: string;
+  eventCode: string;
+  assignment: MatchAssignment | null;
+  members: WorkspaceMember[];
+  role: WorkspaceRole | null;
+  userId: string | null;
+  played: boolean;
+  onChanged: () => void;
+}) {
+  const canEdit = role === "admin" || role === "editor";
+  const isAssignedToMe = !!userId && assignment?.assigned_to === userId;
+
+  const [assigning, setAssigning] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+
+  const [showReport, setShowReport] = useState(false);
+  const [reportText, setReportText] = useState(assignment?.report ?? "");
+  const [confidence, setConfidence] = useState<MatchAssignmentConfidence | "">(
+    assignment?.confidence ?? ""
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  const handleAssign = async () => {
+    if (!selectedUserId) return;
+    setSaving(true);
+    await upsertMatchAssignment({
+      workspaceId,
+      eventCode,
+      matchId,
+      assignedTo: selectedUserId,
+      status: "assigned",
+    });
+    setSaving(false);
+    setAssigning(false);
+    setSelectedUserId("");
+    onChanged();
+  };
+
+  const handleUnassign = async () => {
+    if (!assignment) return;
+    setSaving(true);
+    await deleteMatchAssignment(assignment.id);
+    setSaving(false);
+    onChanged();
+  };
+
+  const handleSubmitReport = async () => {
+    if (!assignment || !reportText.trim()) return;
+    setSubmitting(true);
+    setReportError(null);
+    const { error } = await upsertMatchAssignment({
+      workspaceId,
+      eventCode,
+      matchId,
+      assignedTo: assignment.assigned_to,
+      status: "completed",
+      report: reportText.trim(),
+      confidence: confidence || null,
+    });
+    setSubmitting(false);
+    if (error) { setReportError(error); return; }
+    setShowReport(false);
+    onChanged();
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-zinc-700/50">
+      <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-2">
+        Scout Assignment · {matchLabel}
+      </p>
+
+      {!assignment && (
+        canEdit ? (
+          assigning ? (
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+              >
+                <option value="">Select member…</option>
+                {members.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.display_name ?? m.user_id.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssign}
+                disabled={!selectedUserId || saving}
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--accent)] text-white disabled:opacity-50"
+              >
+                {saving ? "…" : "Assign"}
+              </button>
+              <button
+                onClick={() => setAssigning(false)}
+                className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-700 bg-zinc-800"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAssigning(true)}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              Assign scout
+            </button>
+          )
+        ) : (
+          <p className="text-xs text-zinc-600">No scout assigned.</p>
+        )
+      )}
+
+      {assignment && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                  assignment.status === "completed"
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30"
+                }`}
+              >
+                {assignment.status === "completed" ? "✓ Report submitted" : "Assigned"}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {assignment.assignedToName ?? assignment.assigned_to.slice(0, 8)}
+              </span>
+            </div>
+            {canEdit && (
+              <button
+                onClick={handleUnassign}
+                disabled={saving}
+                className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+
+          {assignment.status === "completed" && assignment.report && (
+            <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 space-y-1">
+              {assignment.confidence && (
+                <span
+                  className={`text-[10px] font-medium uppercase tracking-wider ${
+                    assignment.confidence === "high"
+                      ? "text-emerald-400"
+                      : assignment.confidence === "medium"
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {assignment.confidence} confidence
+                </span>
+              )}
+              <p className="text-xs text-zinc-300 whitespace-pre-wrap">{assignment.report}</p>
+            </div>
+          )}
+
+          {assignment.status === "assigned" && played && (isAssignedToMe || canEdit) && (
+            !showReport ? (
+              <button
+                onClick={() => setShowReport(true)}
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/20 transition-colors"
+              >
+                Submit report
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  {(["high", "medium", "low"] as const).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setConfidence(confidence === c ? "" : c)}
+                      className={`px-2 py-1 rounded text-[10px] font-medium uppercase tracking-wider border transition-colors ${
+                        confidence === c
+                          ? c === "high"
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                            : c === "medium"
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                              : "bg-red-500/20 text-red-400 border-red-500/40"
+                          : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                  placeholder="Observations from this match…"
+                  rows={3}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none"
+                />
+                {reportError && <p className="text-xs text-red-400">{reportError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSubmitReport}
+                    disabled={submitting || !reportText.trim()}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[var(--accent)] text-white disabled:opacity-50"
+                  >
+                    {submitting ? "Submitting…" : "Submit"}
+                  </button>
+                  <button
+                    onClick={() => setShowReport(false)}
+                    className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-700 bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }
