@@ -76,6 +76,16 @@ export interface WorkspaceSuggestion {
   authorName?: string | null;
 }
 
+export interface WorkspacePersonalRanking {
+  id: string;
+  workspace_id: string;
+  pick_list_id: string;
+  user_id: string;
+  ranked_teams: number[];
+  updated_at: string;
+  memberName?: string | null;
+}
+
 export interface WorkspaceActivity {
   id: string;
   workspace_id: string;
@@ -496,6 +506,58 @@ export async function updateSuggestionStatus(
     .from("workspace_suggestions")
     .update({ status })
     .eq("id", suggestionId);
+}
+
+// ── Personal rankings ─────────────────────────────────────────────────────
+
+export async function loadPersonalRankings(
+  pickListId: string
+): Promise<WorkspacePersonalRanking[]> {
+  const { data, error } = await supabase
+    .from("workspace_personal_rankings")
+    .select("*")
+    .eq("pick_list_id", pickListId);
+  if (error || !data) return [];
+
+  const ids = Array.from(new Set(data.map((r) => r.user_id)));
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nameMap = new Map(
+    (profiles ?? []).map((p) => [
+      p.id as string,
+      (p as { display_name: string | null }).display_name,
+    ])
+  );
+
+  return data.map((row) => ({
+    id: row.id,
+    workspace_id: row.workspace_id,
+    pick_list_id: row.pick_list_id,
+    user_id: row.user_id,
+    ranked_teams: row.ranked_teams as number[],
+    updated_at: row.updated_at,
+    memberName: nameMap.get(row.user_id) ?? null,
+  }));
+}
+
+export async function savePersonalRanking(
+  workspaceId: string,
+  pickListId: string,
+  userId: string,
+  rankedTeams: number[]
+): Promise<void> {
+  await supabase.from("workspace_personal_rankings").upsert(
+    {
+      workspace_id: workspaceId,
+      pick_list_id: pickListId,
+      user_id: userId,
+      ranked_teams: rankedTeams,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "pick_list_id,user_id" }
+  );
 }
 
 // ── Activity feed ──────────────────────────────────────────────────────────

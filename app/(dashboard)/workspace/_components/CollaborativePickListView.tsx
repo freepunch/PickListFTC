@@ -17,6 +17,7 @@ import {
   saveWorkspacePickList,
   updateSuggestionStatus,
 } from "@/lib/workspace";
+import { ConsensusView } from "./ConsensusView";
 
 interface Props {
   list: WorkspacePickList;
@@ -28,6 +29,7 @@ export function CollaborativePickListView({ list: initial, onClose }: Props) {
   const { workspace, role, refreshSuggestions } = useWorkspace();
   const { event, teams, loadEvent, setEventCode } = useEvent();
   const [list, setList] = useState<WorkspacePickList>(initial);
+  const [activeTab, setActiveTab] = useState<"list" | "consensus">("list");
   const [suggestions, setSuggestions] = useState<WorkspaceSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState<{
@@ -258,17 +260,42 @@ export function CollaborativePickListView({ list: initial, onClose }: Props) {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowSuggestions((s) => !s)}
-          className="relative px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--bg-card-hover)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
-        >
-          Suggestions
-          {pendingCount > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              {pendingCount}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0.5 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md p-0.5 mr-1">
+            <button
+              onClick={() => setActiveTab("list")}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                activeTab === "list"
+                  ? "bg-[var(--bg-card)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setActiveTab("consensus")}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                activeTab === "consensus"
+                  ? "bg-[var(--bg-card)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Consensus
+            </button>
+          </div>
+          <button
+            onClick={() => setShowSuggestions((s) => !s)}
+            className="relative px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--bg-card-hover)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+          >
+            Suggestions
+            {pendingCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {!eventReady && (
@@ -277,7 +304,19 @@ export function CollaborativePickListView({ list: initial, onClose }: Props) {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {activeTab === "consensus" && (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <ConsensusView
+            list={list}
+            onApplied={(updated) => {
+              setList(updated);
+              setActiveTab("list");
+            }}
+          />
+        </div>
+      )}
+
+      {activeTab === "list" && <div className="flex flex-1 min-h-0 overflow-hidden">
         {canEdit && (
           <div className="w-72 shrink-0 border-r border-[var(--border)] flex flex-col">
             <div className="px-4 py-2.5 border-b border-[var(--border)]">
@@ -451,7 +490,7 @@ export function CollaborativePickListView({ list: initial, onClose }: Props) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {pendingSuggestion && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">

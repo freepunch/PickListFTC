@@ -185,3 +185,35 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.lookup_workspace_by_invite(TEXT) TO anon, authenticated;
+
+-- ── Personal rankings (Consensus Builder) ────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_personal_rankings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  pick_list_id UUID REFERENCES workspace_pick_lists(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  ranked_teams JSONB NOT NULL DEFAULT '[]', -- ordered array of teamNumbers
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(pick_list_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_personal_rankings_pl_idx
+  ON workspace_personal_rankings (pick_list_id);
+
+ALTER TABLE workspace_personal_rankings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read personal rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members read personal rankings" ON workspace_personal_rankings FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Members insert own rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members insert own rankings" ON workspace_personal_rankings FOR INSERT
+  WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND user_id = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Members update own rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members update own rankings" ON workspace_personal_rankings FOR UPDATE
+  USING (user_id = auth.uid());
