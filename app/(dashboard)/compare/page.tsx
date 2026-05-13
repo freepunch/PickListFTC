@@ -313,6 +313,11 @@ const STAT_GROUPS: { title: string; stats: StatBarDef[] }[] = [
         accessor: (s) => s.dev.totalPointsNp,
         format: (v) => `${v.toFixed(1)} dev`,
       },
+      {
+        label: "Penalties Avg",
+        accessor: (s) => s.avg.penaltyPointsCommitted ?? 0,
+        format: (v) => `${v.toFixed(1)} pts`,
+      },
     ],
   },
 ];
@@ -353,16 +358,19 @@ function StatComparisonBar({
 }) {
   const values = teams.map((t) => stat.accessor(t.stats));
   const maxVal = Math.max(...values, 0.01);
-  const isConsistency = stat.label === "Consistency";
+  const isLowerBetter = stat.label === "Consistency" || stat.label === "Penalties Avg";
 
   return (
     <div className="py-2">
-      <p className="text-xs text-zinc-500 mb-1.5">{stat.label}</p>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-zinc-500">{stat.label}</p>
+        {isLowerBetter && <span className="text-[10px] text-zinc-600">(lower = better)</span>}
+      </div>
       <div className="space-y-1">
         {teams.map((team, i) => {
           const val = values[i];
           const pct = (val / maxVal) * 100;
-          const isBest = isConsistency
+          const isBest = isLowerBetter
             ? val === Math.min(...values)
             : val === Math.max(...values);
           const color = TEAM_COLORS[i];

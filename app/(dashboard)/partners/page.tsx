@@ -402,6 +402,7 @@ function PartnerRow({
   selected,
   allTeams,
   penaltyThreshold,
+  mode,
   expanded,
   onToggle,
 }: {
@@ -410,12 +411,22 @@ function PartnerRow({
   selected: ProcessedTeam;
   allTeams: ProcessedTeam[];
   penaltyThreshold: number;
+  mode: string;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const router = useRouter();
   const partner = allTeams.find((t) => t.teamNumber === result.teamNumber)!;
   const partnerPenaltyAvg = partner?.stats.avg.penaltyPointsCommitted ?? 0;
+  const penaltyAdjusted =
+    mode === "balanced" &&
+    penaltyThreshold !== Infinity &&
+    partnerPenaltyAvg > penaltyThreshold;
+  const penaltyDeduction = penaltyAdjusted
+    ? Math.round(
+        Math.min((partnerPenaltyAvg - penaltyThreshold) / (penaltyThreshold || 1), 1) * 5
+      )
+    : 0;
 
   return (
     <div className="border-b border-zinc-800 last:border-b-0" style={{ transition: "transform 0.3s ease, opacity 0.3s ease" }}>
@@ -432,11 +443,18 @@ function PartnerRow({
           <span className="text-sm text-zinc-400 truncate">{result.teamName}</span>
           <PenaltyBadge avg={partnerPenaltyAvg} threshold={penaltyThreshold} />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${scoreBarColor(result.score)}`} style={{ width: `${result.score}%` }} />
+        <div className="flex flex-col justify-center">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${scoreBarColor(result.score)}`} style={{ width: `${result.score}%` }} />
+            </div>
+            <span className="font-mono text-sm font-semibold text-white w-8 text-right">{result.score}</span>
           </div>
-          <span className="font-mono text-sm font-semibold text-white w-8 text-right">{result.score}</span>
+          {penaltyAdjusted && penaltyDeduction > 0 && (
+            <p className="text-[10px] text-amber-400/70 mt-0.5">
+              Score adjusted for penalty risk (-{penaltyDeduction})
+            </p>
+          )}
         </div>
         <span className="font-mono text-sm text-zinc-300 text-center">{result.projectedCombinedOpr.toFixed(1)}</span>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap w-fit ${tagColor(result.complementarityTag)}`}>
@@ -873,6 +891,7 @@ export default function PartnersPage() {
                 selected={selectedTeam}
                 allTeams={teams}
                 penaltyThreshold={penaltyThreshold}
+                mode={mode}
                 expanded={expandedRow === result.teamNumber}
                 onToggle={() => setExpandedRow(expandedRow === result.teamNumber ? null : result.teamNumber)}
               />

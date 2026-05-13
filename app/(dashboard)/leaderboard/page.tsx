@@ -25,7 +25,7 @@ import { AddToPickListButton } from "@/components/AddToPickListButton";
 
 // ── Tab / Column definitions (live mode) ──
 
-type TabId = "overview" | "auto" | "dc" | "advanced";
+type TabId = "overview" | "auto" | "dc" | "advanced" | "penalties";
 
 interface ColDef {
   key: string;
@@ -265,9 +265,14 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
       },
     ],
   },
+  {
+    id: "penalties",
+    label: "Penalties",
+    columns: [],
+  },
 ];
 
-const TAB_ORDER: TabId[] = ["overview", "auto", "dc", "advanced"];
+const TAB_ORDER: TabId[] = ["overview", "auto", "dc", "advanced", "penalties"];
 
 // ── Prescout Tab / Column definitions ──
 
@@ -542,7 +547,7 @@ export default function LeaderboardPage() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
-      if (e.key >= "1" && e.key <= "4" && !e.ctrlKey && !e.metaKey) {
+      if (e.key >= "1" && e.key <= "5" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const idx = parseInt(e.key) - 1;
         if (idx < TAB_ORDER.length) handleTabChange(TAB_ORDER[idx]);
@@ -651,7 +656,7 @@ export default function LeaderboardPage() {
             <h2 className="text-xl font-semibold text-zinc-200 mb-2">Leaderboard</h2>
             <p className="text-sm text-zinc-500">Load an event to see team rankings</p>
             <p className="hidden md:block text-xs text-zinc-600 mt-3">
-              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">1</kbd>-<kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">4</kbd> to switch tabs
+              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">1</kbd>-<kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">5</kbd> to switch tabs
             </p>
           </div>
         )}
@@ -736,7 +741,17 @@ export default function LeaderboardPage() {
               {isPrescout && " \u00b7 Season data"}
             </p>
 
+            {/* Penalties tab — custom component */}
+            {activeTab === "penalties" && !isPrescout && (
+              <PenaltyLeaderboard
+                teams={sorted}
+                matches={event.matches}
+                penaltyThreshold={penaltyThreshold}
+              />
+            )}
+
             {/* Table */}
+            {!(activeTab === "penalties" && !isPrescout) && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 <table className="w-full text-sm">
@@ -1025,6 +1040,7 @@ export default function LeaderboardPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
       </div>
@@ -1097,6 +1113,186 @@ function InlineNotesSection({ teamNumber }: { teamNumber: number }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Penalty Leaderboard (custom table for Penalties tab) ──
+
+type PenaltySortKey = "avg" | "majors" | "minors" | "rate" | "impact";
+
+interface PenaltyRow {
+  team: ProcessedTeam;
+  avg: number;
+  majors: number;
+  minors: number;
+  rate: number;
+  impact: number;
+}
+
+function penaltyRiskLabel(avg: number): { label: string; color: string; bg: string } {
+  if (avg < 5) return { label: "Low", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" };
+  if (avg <= 15) return { label: "Moderate", color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" };
+  return { label: "High", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" };
+}
+
+function PenaltyLeaderboard({
+  teams,
+  matches,
+  penaltyThreshold,
+}: {
+  teams: ProcessedTeam[];
+  matches: Match[];
+  penaltyThreshold: number;
+}) {
+  const [penaltySortKey, setPenaltySortKey] = useState<PenaltySortKey>("avg");
+  const [penaltySortAsc, setPenaltySortAsc] = useState(true);
+
+  const penaltyRateMap = useMemo(() => {
+    const map = new Map<number, { played: number; withPenalty: number }>();
+    for (const m of matches) {
+      if (!m.hasBeenPlayed || !m.scores) continue;
+      for (const mt of m.teams) {
+        const alliance = mt.alliance.toLowerCase() as "red" | "blue";
+        const score = m.scores[alliance];
+        if (!score) continue;
+        const cur = map.get(mt.teamNumber) ?? { played: 0, withPenalty: 0 };
+        cur.played++;
+        if ((score.penaltyPointsCommitted ?? 0) > 0) cur.withPenalty++;
+        map.set(mt.teamNumber, cur);
+      }
+    }
+    const rateMap = new Map<number, number>();
+    for (const [num, { played, withPenalty }] of map) {
+      rateMap.set(num, played > 0 ? (withPenalty / played) * 100 : 0);
+    }
+    return rateMap;
+  }, [matches]);
+
+  const rows = useMemo<PenaltyRow[]>(() => {
+    return teams.map((t) => ({
+      team: t,
+      avg: t.stats.avg.penaltyPointsCommitted ?? 0,
+      majors: t.stats.avg.majorsCommittedPoints ?? 0,
+      minors: t.stats.avg.minorsCommittedPoints ?? 0,
+      rate: penaltyRateMap.get(t.teamNumber) ?? 0,
+      impact: t.stats.opr.totalPointsNp > 0
+        ? ((t.stats.avg.penaltyPointsCommitted ?? 0) / t.stats.opr.totalPointsNp) * 100
+        : 0,
+    }));
+  }, [teams, penaltyRateMap]);
+
+  const rankMap = useMemo(() => {
+    const byAvg = [...rows].sort((a, b) => a.avg - b.avg);
+    const m = new Map<number, number>();
+    byAvg.forEach((r, i) => m.set(r.team.teamNumber, i + 1));
+    return m;
+  }, [rows]);
+
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const av = a[penaltySortKey];
+      const bv = b[penaltySortKey];
+      return penaltySortAsc ? av - bv : bv - av;
+    });
+  }, [rows, penaltySortKey, penaltySortAsc]);
+
+  const handleSort = (key: PenaltySortKey) => {
+    if (penaltySortKey === key) {
+      setPenaltySortAsc(!penaltySortAsc);
+    } else {
+      setPenaltySortKey(key);
+      setPenaltySortAsc(true);
+    }
+  };
+
+  const SortHeader = ({ label, col, hideOnMobile }: { label: string; col: PenaltySortKey; hideOnMobile?: boolean }) => {
+    const isSorted = penaltySortKey === col;
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        className={`px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors whitespace-nowrap text-right ${
+          isSorted ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-zinc-500 hover:text-zinc-300"
+        } ${hideOnMobile ? "hidden sm:table-cell" : ""}`}
+      >
+        <span className="inline-flex items-center gap-1 justify-end">
+          {label}
+          {isSorted && (
+            <svg className={`w-3 h-3 transition-transform ${penaltySortAsc ? "" : "rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+            </svg>
+          )}
+        </span>
+      </th>
+    );
+  };
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-800">
+              <th className="w-12 px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-left text-zinc-500">Rank</th>
+              <th className="px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-left text-zinc-500">Team</th>
+              <SortHeader label="Avg / Match" col="avg" />
+              <SortHeader label="Avg Majors" col="majors" hideOnMobile />
+              <SortHeader label="Avg Minors" col="minors" hideOnMobile />
+              <SortHeader label="Penalty Rate" col="rate" />
+              <SortHeader label="OPR Impact" col="impact" hideOnMobile />
+              <th className="px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-right text-zinc-500">Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row, i) => {
+              const risk = penaltyRiskLabel(row.avg);
+              const rank = rankMap.get(row.team.teamNumber) ?? i + 1;
+              return (
+                <tr
+                  key={row.team.teamNumber}
+                  className={`border-b border-zinc-800/50 ${
+                    i % 2 === 0 ? "bg-zinc-900" : "bg-zinc-900/60"
+                  } hover:bg-zinc-800/70 transition-colors`}
+                >
+                  <td className="px-2 sm:px-3 py-2.5 font-mono text-zinc-500">#{rank}</td>
+                  <td className="px-2 sm:px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/report/${row.team.teamNumber}`} className="font-mono text-white font-medium hover:underline shrink-0">
+                        {row.team.teamNumber}
+                      </Link>
+                      <span className="text-zinc-400 truncate max-w-[160px]">{row.team.teamName}</span>
+                      <PenaltyBadge avg={row.avg} threshold={penaltyThreshold} />
+                    </div>
+                  </td>
+                  <td className={`px-2 sm:px-3 py-2.5 text-right font-mono font-medium ${penaltyColor(row.avg)}`}>
+                    {row.avg.toFixed(1)}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-400">
+                    {row.majors > 0 ? row.majors.toFixed(1) : "—"}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-400">
+                    {row.minors > 0 ? row.minors.toFixed(1) : "—"}
+                  </td>
+                  <td className="px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-300">
+                    {row.rate > 0 ? `${row.rate.toFixed(0)}%` : "—"}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-500">
+                    {row.impact > 0 ? `${row.impact.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-2 sm:px-3 py-2.5 text-right">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${risk.bg} ${risk.color}`}>
+                      {risk.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {sorted.length === 0 && (
+        <div className="py-12 text-center text-zinc-500 text-sm">No team data available</div>
       )}
     </div>
   );
