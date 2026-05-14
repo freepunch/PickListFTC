@@ -16,6 +16,7 @@ import { getWLT } from "@/lib/calculations";
 import { ProcessedTeam, Match, Alliance, PrescoutRankedTeam, TeamEventEntry, TeamEventStats2025 } from "@/lib/types";
 import { penaltyP75 } from "@/lib/calculations";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import { NotesBadge } from "@/components/NotesBadge";
 import { NoteForm } from "@/components/NoteForm";
 import { useNotes } from "@/context/NotesContext";
@@ -741,13 +742,15 @@ export default function LeaderboardPage() {
               {isPrescout && " \u00b7 Season data"}
             </p>
 
-            {/* Penalties tab — custom component */}
+            {/* Penalties tab — custom component, workspace-gated */}
             {activeTab === "penalties" && !isPrescout && (
-              <PenaltyLeaderboard
-                teams={sorted}
-                matches={event.matches}
-                penaltyThreshold={penaltyThreshold}
-              />
+              <WorkspaceGate feature="Penalty Analytics" description="Create or join a workspace to access Penalty Analytics, Alliance Simulator, Draft Board, and more.">
+                <PenaltyLeaderboard
+                  teams={sorted}
+                  matches={event.matches}
+                  penaltyThreshold={penaltyThreshold}
+                />
+              </WorkspaceGate>
             )}
 
             {/* Table */}

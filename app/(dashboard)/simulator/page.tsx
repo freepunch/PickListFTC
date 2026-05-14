@@ -5,6 +5,7 @@ import { useEvent } from "@/context/EventContext";
 import { useWorkspaceOptional } from "@/context/WorkspaceContext";
 import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
 import { loadWorkspacePickList } from "@/lib/workspace";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import type { ProcessedTeam } from "@/lib/types";
 
 // ── Win probability ──────────────────────────────────────────────────────────
@@ -335,6 +336,7 @@ export default function SimulatorPage() {
   }, [alliances, allStats]);
 
   return (
+    <WorkspaceGate feature="Alliance Simulator" description="Create or join a workspace to access the Alliance Simulator, Draft Board, Scoring Heatmap, Penalty Analytics, and more.">
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
@@ -724,6 +726,7 @@ export default function SimulatorPage() {
         </section>
       </div>
     </div>
+    </WorkspaceGate>
   );
 }
 

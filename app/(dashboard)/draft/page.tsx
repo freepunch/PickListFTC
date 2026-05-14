@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useEvent } from "@/context/EventContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import { supabase } from "@/lib/supabase";
 import { WorkspaceDraft, loadDraft } from "@/lib/workspace";
 import { DraftSetup } from "./_components/DraftSetup";
@@ -76,12 +77,9 @@ export default function DraftPage() {
 
   if (!workspace) {
     return (
-      <div className="px-6 py-12 max-w-md mx-auto text-center">
-        <h1 className="text-lg font-semibold text-[var(--foreground)] mb-1">Draft Board</h1>
-        <p className="text-sm text-[var(--foreground-dim)]">
-          The draft board is a workspace feature. Create or join a workspace first.
-        </p>
-      </div>
+      <WorkspaceGate feature="Draft Board">
+        <></>
+      </WorkspaceGate>
     );
   }
 

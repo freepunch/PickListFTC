@@ -93,6 +93,7 @@ const PLAN_NAV = [
     href: "/simulator",
     label: "Alliance Sim",
     eventOptional: true,
+    needsWorkspace: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
@@ -475,6 +476,7 @@ function NavLink({
   isActive,
   collapsed,
   disabled,
+  wsLocked,
   onClick,
 }: {
   href: string;
@@ -483,6 +485,7 @@ function NavLink({
   isActive: boolean;
   collapsed: boolean;
   disabled?: boolean;
+  wsLocked?: boolean;
   onClick?: () => void;
 }) {
   const cls = `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 min-h-[40px] ${
@@ -490,7 +493,9 @@ function NavLink({
       ? "bg-[var(--accent-muted)] text-[var(--accent)]"
       : disabled
         ? "text-[var(--foreground-dim)] cursor-not-allowed"
-        : "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card-hover)]"
+        : wsLocked
+          ? "text-[var(--foreground-dim)] hover:text-[var(--foreground-muted)] hover:bg-[var(--bg-card-hover)]"
+          : "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card-hover)]"
   } ${collapsed ? "justify-center" : ""}`;
 
   if (disabled) {
@@ -503,9 +508,19 @@ function NavLink({
   }
 
   return (
-    <Link href={href} onClick={onClick} title={collapsed ? label : undefined} className={cls}>
+    <Link
+      href={href}
+      onClick={onClick}
+      title={collapsed ? (wsLocked ? `${label} (Workspace)` : label) : undefined}
+      className={cls}
+    >
       <span className="shrink-0">{icon}</span>
-      {!collapsed && <span>{label}</span>}
+      {!collapsed && <span className="flex-1">{label}</span>}
+      {!collapsed && wsLocked && (
+        <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+        </svg>
+      )}
     </Link>
   );
 }
@@ -526,7 +541,7 @@ function SidebarContent({
   const { event, teams, lastUpdated, loading, refreshEvent } = useEvent();
   const { user, showTeamPrompt, showMigrationPrompt } = useAuth();
   const { isEventFavorited, toggleEventFav } = useFavorites();
-  const { workspace: ws, pendingSuggestions: wsPending } = useWorkspace();
+  const { workspace: ws, pendingSuggestions: wsPending, isInWorkspace } = useWorkspace();
   const workspacePendingCount = wsPending.length;
   const [showReportSearch, setShowReportSearch] = useState(false);
   const [reportQuery, setReportQuery] = useState("");
@@ -634,17 +649,16 @@ function SidebarContent({
   // Replace nested nav groups with a single tappable list. Each row is at least
   // 48px tall, with a clear icon + label.
   if (isMobile) {
-    const allItems: { href: string; label: string; icon: React.ReactNode; needsEvent: boolean; section?: string }[] = [
+    const allItems: { href: string; label: string; icon: React.ReactNode; needsEvent: boolean; section?: string; wsLocked?: boolean }[] = [
       { href: "/dashboard", label: "Dashboard", icon: DASHBOARD_ITEM.icon, needsEvent: false },
       ...SCOUT_NAV.filter((it) => !it.isReport).map((it) => ({
         href: it.href, label: it.label, icon: it.icon, needsEvent: true,
       })),
-      ...PLAN_NAV
-        .filter((it) => !("needsWorkspace" in it && it.needsWorkspace) || !!ws)
-        .map((it) => ({
-          href: it.href, label: it.label, icon: it.icon,
-          needsEvent: !("eventOptional" in it && it.eventOptional),
-        })),
+      ...PLAN_NAV.map((it) => ({
+        href: it.href, label: it.label, icon: it.icon,
+        needsEvent: !("eventOptional" in it && it.eventOptional),
+        wsLocked: "needsWorkspace" in it && it.needsWorkspace && !isInWorkspace,
+      })),
       // Team Report — special: opens a number prompt instead of a route. Works without an event.
       { href: "/report", label: "Team Report", icon: SCOUT_NAV.find((it) => it.isReport)!.icon, needsEvent: false, section: "report" },
       ...SEASON_NAV.map((it, i) => ({
@@ -689,6 +703,7 @@ function SidebarContent({
                 ? pathname === "/dashboard"
                 : pathname.startsWith(it.href);
             const disabled = it.needsEvent && !hasEvent;
+            const wsLocked = "wsLocked" in it && it.wsLocked;
             const showDivider = it.section === "season-divider" || it.section === "settings-divider";
 
             // Special: Team Report opens a numeric prompt
@@ -725,7 +740,9 @@ function SidebarContent({
                 ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                 : disabled
                   ? "text-zinc-700 cursor-not-allowed"
-                  : "text-zinc-300 active:bg-zinc-800 hover:bg-zinc-800"
+                  : wsLocked
+                    ? "text-zinc-600 active:bg-zinc-800 hover:bg-zinc-800 hover:text-zinc-400"
+                    : "text-zinc-300 active:bg-zinc-800 hover:bg-zinc-800"
             }`;
 
             return (
@@ -739,7 +756,12 @@ function SidebarContent({
                 ) : (
                   <Link href={it.href} onClick={onNavClick} className={linkCls}>
                     <span className="shrink-0">{it.icon}</span>
-                    <span>{it.label}</span>
+                    <span className="flex-1">{it.label}</span>
+                    {wsLocked && (
+                      <svg className="w-3.5 h-3.5 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    )}
                   </Link>
                 )}
               </div>
@@ -824,14 +846,14 @@ function SidebarContent({
           collapsed={collapsed}
           isMobile={isMobile}
         >
-          {PLAN_NAV
-            .filter((item) => !("needsWorkspace" in item && item.needsWorkspace) || !!ws)
-            .map((item) => {
+          {PLAN_NAV.map((item) => {
             const isActive = item.href === "/picklist"
               ? pathname === "/picklist"
               : pathname.startsWith(item.href);
             const eventOptional = "eventOptional" in item && item.eventOptional;
             const itemDisabled = !eventOptional && !hasEvent;
+            const needsWs = "needsWorkspace" in item && item.needsWorkspace;
+            const wsLocked = needsWs && !isInWorkspace;
             const showDot = item.href === "/workspace" && workspacePendingCount > 0;
             return (
               <div key={item.href} className="relative">
@@ -842,6 +864,7 @@ function SidebarContent({
                   isActive={isActive}
                   collapsed={collapsed}
                   disabled={itemDisabled}
+                  wsLocked={wsLocked}
                   onClick={onNavClick}
                 />
                 {showDot && (

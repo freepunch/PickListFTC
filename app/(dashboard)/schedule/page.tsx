@@ -1426,6 +1426,7 @@ export default function SchedulePage() {
   } = useEvent();
   const { profile, user } = useAuth();
   const ws = useWorkspaceOptional();
+  const isInWorkspace = !!ws?.isInWorkspace;
 
   // My team state
   const [myTeam, setMyTeam] = useState<number | null>(null);
@@ -1694,7 +1695,7 @@ export default function SchedulePage() {
   // Event-wide heatmap range: min/max combined alliance OPR across all matches.
   // Used to scale the saturation/opacity of the heatmap bar behind alliance cells.
   const heatmapRange = useMemo(() => {
-    if (isPrescout || allMatches.length === 0) return null;
+    if (!isInWorkspace || isPrescout || allMatches.length === 0) return null;
     let min = Infinity;
     let max = -Infinity;
     for (const m of allMatches) {
@@ -1703,7 +1704,7 @@ export default function SchedulePage() {
     }
     if (!isFinite(min) || !isFinite(max) || max <= 0) return null;
     return { min, max };
-  }, [allMatches, isPrescout]);
+  }, [allMatches, isPrescout, isInWorkspace]);
 
   // On Deck = first unplayed; In The Hole = second unplayed
   const { onDeckId, inTheHoleId } = useMemo(() => {
