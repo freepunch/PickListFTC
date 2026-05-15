@@ -7,6 +7,8 @@ import { EventLoader, focusEventInput } from "@/components/EventLoader";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { StatCard } from "@/components/StatCard";
 import { ScoreDistribution } from "@/components/ScoreDistribution";
+import { ScoringTrendHeatmap } from "@/components/ScoringTrendHeatmap";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import { PrescoutRankedTeam } from "@/lib/types";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
@@ -571,6 +573,7 @@ function SeasonOverviewOrEmpty() {
 
 export default function DashboardPage() {
   const { event, teams, loading, isPrescout } = useEvent();
+  const { profile } = useAuth();
 
   // "/" keyboard shortcut to focus event search
   useEffect(() => {
@@ -746,6 +749,45 @@ export default function DashboardPage() {
                 <ScoreDistribution matches={event.matches} />
               </div>
             </div>
+
+            {/* Scoring Trends Heatmap */}
+            <WorkspaceGate
+              feature="Scoring Trends"
+              description="Create or join a workspace to unlock the Scoring Trend Heatmap, Draft Board, Alliance Simulator, and more."
+            >
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-200">Scoring Trends</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Team performance across all matches · sorted by OPR
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-zinc-600 font-mono">
+                    {playedMatches.length} matches · {teams.length} teams
+                  </span>
+                </div>
+                <div className="p-4">
+                  {playedMatches.length >= 3 ? (
+                    <ScoringTrendHeatmap
+                      matches={event.matches}
+                      teams={teams}
+                      eventCode={event.code}
+                      myTeam={profile?.team_number ?? null}
+                    />
+                  ) : (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-zinc-500">
+                        Scoring trends will appear after more matches are played.
+                      </p>
+                      <p className="text-xs text-zinc-600 mt-1">
+                        {playedMatches.length} of 3 needed
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </WorkspaceGate>
           </div>
         )}
       </div>
