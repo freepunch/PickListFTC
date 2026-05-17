@@ -533,7 +533,8 @@ export default function LeaderboardPage() {
   const currentTab = TABS.find((t) => t.id === activeTab)!;
   const columns = currentTab.columns;
 
-  const currentPsTab = PRESCOUT_TABS.find((t) => t.id === activeTab)!;
+  // PRESCOUT_TABS has no "penalties" entry — fall back to overview so psColumns is never undefined
+  const currentPsTab = PRESCOUT_TABS.find((t) => t.id === activeTab) ?? PRESCOUT_TABS[0];
   const psColumns = currentPsTab.columns;
 
   // Debounce search input
