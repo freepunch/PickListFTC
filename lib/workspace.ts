@@ -14,6 +14,7 @@ export interface Workspace {
   season: number;
   paid: boolean;
   created_at: string;
+  expires_at: string | null;
 }
 
 export interface WorkspaceMember {
@@ -922,6 +923,14 @@ export function describeActivity(a: WorkspaceActivity): string {
     default:
       return `${who} ${a.kind.replace(/\./g, " ")}`;
   }
+}
+
+export function formatExpiry(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export function formatRelative(iso: string): string {

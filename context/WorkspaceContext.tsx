@@ -7,6 +7,7 @@ import {
   useState,
   useCallback,
   useRef,
+  useMemo,
   ReactNode,
 } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -26,6 +27,8 @@ import {
 interface WorkspaceContextValue {
   loading: boolean;
   isInWorkspace: boolean;
+  isExpired: boolean;
+  daysUntilExpiry: number | null;
   workspace: Workspace | null;
   role: WorkspaceRole | null;
   members: WorkspaceMember[];
@@ -65,6 +68,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!workspace) return;
     const s = await loadSuggestions(workspace.id);
     setPendingSuggestions(s.filter((x) => x.status === "pending"));
+  }, [workspace]);
+
+  const isExpired = useMemo(() => {
+    if (!workspace?.expires_at) return false;
+    return new Date(workspace.expires_at).getTime() < Date.now();
+  }, [workspace]);
+
+  const daysUntilExpiry = useMemo(() => {
+    if (!workspace?.expires_at) return null;
+    const ms = new Date(workspace.expires_at).getTime() - Date.now();
+    return Math.ceil(ms / (1000 * 60 * 60 * 24));
   }, [workspace]);
 
   const refresh = useCallback(async () => {
@@ -182,6 +196,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       value={{
         loading,
         isInWorkspace: !!workspace,
+        isExpired,
+        daysUntilExpiry,
         workspace,
         role,
         members,

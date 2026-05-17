@@ -5,6 +5,7 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { useEvent } from "@/context/EventContext";
 import {
   describeActivity,
+  formatExpiry,
   formatRelative,
   loadActivity,
   loadWorkspacePickLists,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/workspace";
 
 export function OverviewTab() {
-  const { workspace, members, notes } = useWorkspace();
+  const { workspace, members, notes, isExpired, daysUntilExpiry } = useWorkspace();
   const { event } = useEvent();
   const [activity, setActivity] = useState<WorkspaceActivity[]>([]);
   const [pickListEvents, setPickListEvents] = useState<number>(0);
@@ -53,7 +54,7 @@ export function OverviewTab() {
 
   return (
     <div className="px-6 py-6 max-w-5xl">
-      <div className="grid sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <Stat label="Members" value={members.length} />
         <Stat label="Shared notes" value={notes.length} />
         <Stat label="Pick lists" value={pickListEvents} />
@@ -62,6 +63,33 @@ export function OverviewTab() {
           value={`${workspace.season}-${(workspace.season + 1).toString().slice(-2)}`}
         />
       </div>
+
+      {workspace.expires_at && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 mb-6">
+          <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)]">
+            Subscription
+          </p>
+          <p className="text-sm font-semibold text-[var(--foreground)] mt-0.5">
+            {isExpired
+              ? "Expired"
+              : `Active until ${formatExpiry(workspace.expires_at)}`}
+          </p>
+          {daysUntilExpiry !== null && !isExpired && daysUntilExpiry <= 30 && (
+            <p
+              className={`text-xs mt-0.5 ${
+                daysUntilExpiry <= 7 ? "text-red-400" : "text-amber-400"
+              }`}
+            >
+              {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""} remaining
+            </p>
+          )}
+          {isExpired && (
+            <p className="text-xs text-red-400 mt-0.5">
+              Renew from the Members tab to restore full access.
+            </p>
+          )}
+        </div>
+      )}
 
       {event && matchAssignments.length > 0 && (() => {
         const total = matchAssignments.length;

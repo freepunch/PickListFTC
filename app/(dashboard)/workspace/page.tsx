@@ -17,11 +17,19 @@ type TabId = "overview" | "notes" | "picklists" | "members" | "scouting";
 
 export default function WorkspacePage() {
   const { user, loading: authLoading } = useAuth();
-  const { loading, isInWorkspace, workspace, role, pendingSuggestions } =
-    useWorkspace();
+  const {
+    loading,
+    isInWorkspace,
+    isExpired,
+    daysUntilExpiry,
+    workspace,
+    role,
+    pendingSuggestions,
+  } = useWorkspace();
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("overview");
   const [showSettings, setShowSettings] = useState(false);
+  const [renewingBanner, setRenewingBanner] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/");
@@ -40,6 +48,25 @@ export default function WorkspacePage() {
   if (!workspace) return null;
 
   const isAdmin = role === "admin";
+
+  const handleRenewBanner = async () => {
+    setRenewingBanner(true);
+    try {
+      const res = await fetch("/api/workspace-renew", { method: "POST" });
+      const json = await res.json();
+      if (json.url) window.location.href = json.url;
+      else setRenewingBanner(false);
+    } catch {
+      setRenewingBanner(false);
+    }
+  };
+
+  const showBanner =
+    workspace.expires_at !== null &&
+    daysUntilExpiry !== null &&
+    daysUntilExpiry <= 30;
+  const bannerUrgent = daysUntilExpiry !== null && daysUntilExpiry <= 7;
+  const bannerCritical = isExpired;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -127,6 +154,35 @@ export default function WorkspacePage() {
           </button>
         ))}
       </div>
+
+      {showBanner && (
+        <div
+          className={`mx-4 mt-3 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3 border text-sm shrink-0 ${
+            bannerCritical
+              ? "bg-red-500/10 border-red-500/20 text-red-400"
+              : bannerUrgent
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+              : "bg-yellow-500/10 border-yellow-500/20 text-yellow-500"
+          }`}
+        >
+          <span>
+            {bannerCritical
+              ? "Your workspace has expired. Renew to restore full access."
+              : daysUntilExpiry === 1
+              ? "Your workspace expires tomorrow."
+              : `Your workspace expires in ${daysUntilExpiry} days.`}
+          </span>
+          {isAdmin && (
+            <button
+              onClick={handleRenewBanner}
+              disabled={renewingBanner}
+              className="shrink-0 px-3 py-1 rounded-md text-xs font-medium border border-current/30 hover:bg-current/10 transition-colors disabled:opacity-50"
+            >
+              {renewingBanner ? "Redirecting…" : "Renew · $20"}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className={tab === "scouting" ? "flex-1 min-h-0 overflow-hidden" : "flex-1 overflow-y-auto"}>
         {tab === "overview" && <OverviewTab />}

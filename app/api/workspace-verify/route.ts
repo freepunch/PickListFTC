@@ -118,6 +118,7 @@ export async function POST(request: Request) {
         season: 2025,
         stripe_session_id: sessionId,
         paid: true,
+        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select()
       .single();

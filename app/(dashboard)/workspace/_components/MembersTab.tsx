@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import {
   WorkspaceRole,
+  formatExpiry,
   formatRelative,
   leaveWorkspace,
   removeMember,
@@ -16,14 +17,35 @@ const ROLE_OPTIONS: WorkspaceRole[] = ["admin", "editor", "viewer"];
 
 export function MembersTab() {
   const { user } = useAuth();
-  const { workspace, role, members, refresh, refreshMembers } = useWorkspace();
+  const {
+    workspace,
+    role,
+    members,
+    refresh,
+    refreshMembers,
+    isExpired,
+    daysUntilExpiry,
+  } = useWorkspace();
   const router = useRouter();
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [renewing, setRenewing] = useState(false);
 
   if (!workspace) return null;
   const isAdmin = role === "admin";
+
+  const handleRenew = async () => {
+    setRenewing(true);
+    try {
+      const res = await fetch("/api/workspace-renew", { method: "POST" });
+      const json = await res.json();
+      if (json.url) window.location.href = json.url;
+      else setRenewing(false);
+    } catch {
+      setRenewing(false);
+    }
+  };
 
   const handleRoleChange = async (userId: string, newRole: WorkspaceRole) => {
     if (userId === workspace.owner_id && newRole !== "admin") {
@@ -56,6 +78,48 @@ export function MembersTab() {
 
   return (
     <div className="px-6 py-6 max-w-3xl">
+      {isAdmin && workspace.expires_at && (
+        <div
+          className={`flex items-center justify-between gap-3 rounded-xl border p-4 mb-6 ${
+            isExpired
+              ? "bg-red-500/10 border-red-500/20"
+              : daysUntilExpiry !== null && daysUntilExpiry <= 7
+              ? "bg-amber-500/10 border-amber-500/20"
+              : "bg-[var(--bg-card)] border-[var(--border)]"
+          }`}
+        >
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-dim)]">
+              Subscription
+            </p>
+            <p className="text-sm font-semibold text-[var(--foreground)] mt-0.5">
+              {isExpired
+                ? "Expired"
+                : `Active until ${formatExpiry(workspace.expires_at)}`}
+            </p>
+            {!isExpired &&
+              daysUntilExpiry !== null &&
+              daysUntilExpiry <= 30 && (
+                <p
+                  className={`text-xs mt-0.5 ${
+                    daysUntilExpiry <= 7 ? "text-red-400" : "text-amber-400"
+                  }`}
+                >
+                  {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}{" "}
+                  remaining
+                </p>
+              )}
+          </div>
+          <button
+            onClick={handleRenew}
+            disabled={renewing}
+            className="shrink-0 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white transition-colors disabled:opacity-50"
+          >
+            {renewing ? "Redirecting…" : "Renew · $20"}
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">
           {members.length} member{members.length === 1 ? "" : "s"}
