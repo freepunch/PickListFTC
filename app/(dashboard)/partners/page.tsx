@@ -718,7 +718,8 @@ function PartnersSkeleton() {
 }
 
 export default function PartnersPage() {
-  const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading } = useEvent();
+  const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading, dataSource } = useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
   const [selectedTeam, setSelectedTeam] = useState<ProcessedTeam | null>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [mode, setMode] = useState<PartnerMode>("balanced");
@@ -731,16 +732,16 @@ export default function PartnersPage() {
   );
 
   const ranked = useMemo(() => {
-    if (!selectedTeam || isPrescout) return [];
+    if (!selectedTeam || useSeasonData) return [];
     return rankPartners(selectedTeam, teams, mode);
-  }, [selectedTeam, teams, mode, isPrescout]);
+  }, [selectedTeam, teams, mode, useSeasonData]);
 
   const prescoutRanked = useMemo(() => {
-    if (!selectedPrescout || !isPrescout) return [];
+    if (!selectedPrescout || !useSeasonData) return [];
     return rankPrescoutPartners(selectedPrescout, prescoutRanking, psMode);
-  }, [selectedPrescout, prescoutRanking, psMode, isPrescout]);
+  }, [selectedPrescout, prescoutRanking, psMode, useSeasonData]);
 
-  const activeMode = isPrescout
+  const activeMode = useSeasonData
     ? PRESCOUT_MODES.find((m) => m.key === psMode)!
     : MODES.find((m) => m.key === mode)!;
 
@@ -797,7 +798,7 @@ export default function PartnersPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Partner Finder</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            {isPrescout
+            {useSeasonData
               ? `Select your team to see ranked alliance partners based on season performance`
               : `Select your team to see ranked alliance partners at ${event.name}`
             }
@@ -825,22 +826,22 @@ export default function PartnersPage() {
 
         {/* Selected team card */}
         {selectedTeam && (
-          <SelectedTeamCard team={selectedTeam} isPrescout={isPrescout} prescoutTeam={selectedPrescout} />
+          <SelectedTeamCard team={selectedTeam} isPrescout={useSeasonData} prescoutTeam={selectedPrescout} />
         )}
 
         {/* Mode selector */}
         {selectedTeam && (
           <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg overflow-x-auto scrollbar-hide w-full sm:w-fit">
-            {(isPrescout ? PRESCOUT_MODES : MODES).map((m) => (
+            {(useSeasonData ? PRESCOUT_MODES : MODES).map((m) => (
               <button
                 key={m.key}
                 onClick={() => {
-                  if (isPrescout) setPsMode(m.key);
+                  if (useSeasonData) setPsMode(m.key);
                   else setMode(m.key as PartnerMode);
                   setExpandedRow(null);
                 }}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  (isPrescout ? psMode : mode) === m.key
+                  (useSeasonData ? psMode : mode) === m.key
                     ? "bg-[var(--accent)] text-white shadow-sm"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
                 }`}
@@ -852,7 +853,7 @@ export default function PartnersPage() {
         )}
 
         {/* Partner list (live) */}
-        {selectedTeam && !isPrescout && ranked.length > 0 && (
+        {selectedTeam && !useSeasonData && ranked.length > 0 && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>
@@ -900,7 +901,7 @@ export default function PartnersPage() {
         )}
 
         {/* Partner list (prescout) */}
-        {selectedTeam && isPrescout && prescoutRanked.length > 0 && selectedPrescout && (
+        {selectedTeam && useSeasonData && prescoutRanked.length > 0 && selectedPrescout && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>

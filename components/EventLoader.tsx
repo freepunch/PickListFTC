@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
+import { useWorkspaceOptional } from "@/context/WorkspaceContext";
 import { searchEvents } from "@/lib/api";
 import { EventSearchResult } from "@/lib/types";
 import { ShareButton } from "@/components/SharePopover";
@@ -229,10 +230,12 @@ function EventResultRow({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
-  const { loadEvent, loading, error, event, eventCode, setEventCode } =
+  const { loadEvent, loading, error, event, eventCode, setEventCode, dataSource, setDataSource, isPrescout, prescoutLoading, prescoutRanking } =
     useEvent();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const ws = useWorkspaceOptional();
+  const isInWorkspace = !!ws?.isInWorkspace;
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [mode, setMode] = useState<"empty" | "search">("empty");
@@ -849,6 +852,45 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
           </div>
         )}
       </form>
+
+      {!bare && isInWorkspace && event && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800/60 flex-wrap">
+          <span className="text-xs text-zinc-500 shrink-0">Data source</span>
+          <div className="flex gap-0.5 p-0.5 bg-zinc-800 rounded-lg">
+            {(["season", "event"] as const).map((src) => (
+              <button
+                key={src}
+                type="button"
+                onClick={() => setDataSource(src)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  dataSource === src
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {src === "season" ? "Season" : "Event Day"}
+              </button>
+            ))}
+          </div>
+          {prescoutLoading && dataSource === "season" && !isPrescout && (
+            <span className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+              <Spinner className="w-3 h-3" />
+              Loading season data…
+            </span>
+          )}
+          {dataSource === "event" && isPrescout && (
+            <span className="text-[10px] text-amber-400/70">
+              No event-day data yet · showing season data
+            </span>
+          )}
+          {dataSource === "season" && !isPrescout && !prescoutLoading && prescoutRanking.length > 0 && (
+            <span className="text-[10px] text-zinc-600">Season data active</span>
+          )}
+          {dataSource === "event" && !isPrescout && (
+            <span className="text-[10px] text-zinc-600">Event day data active</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

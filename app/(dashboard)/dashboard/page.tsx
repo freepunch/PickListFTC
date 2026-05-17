@@ -572,7 +572,8 @@ function SeasonOverviewOrEmpty() {
 }
 
 export default function DashboardPage() {
-  const { event, teams, loading, isPrescout } = useEvent();
+  const { event, teams, loading, isPrescout, dataSource, prescoutRanking, prescoutLoading } = useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
   const { profile } = useAuth();
 
   // "/" keyboard shortcut to focus event search
@@ -611,20 +612,18 @@ export default function DashboardPage() {
     };
   }, [playedMatches]);
 
-  const topOprTeam = useMemo(
-    () =>
-      teams.length > 0
-        ? teams.reduce((best, t) =>
-            t.stats.opr.totalPointsNp > best.stats.opr.totalPointsNp ? t : best
-          )
-        : null,
-    [teams]
-  );
+  const topOprTeam = useMemo(() => {
+    if (useSeasonData && prescoutRanking.length > 0) return prescoutRanking[0];
+    if (teams.length === 0) return null;
+    return teams.reduce((best, t) =>
+      t.stats.opr.totalPointsNp > best.stats.opr.totalPointsNp ? t : best
+    );
+  }, [teams, useSeasonData, prescoutRanking]);
 
-  const top10 = useMemo(
-    () => [...teams].sort((a, b) => a.stats.rank - b.stats.rank).slice(0, 10),
-    [teams]
-  );
+  const top10 = useMemo(() => {
+    if (useSeasonData && prescoutRanking.length > 0) return prescoutRanking.slice(0, 10);
+    return [...teams].sort((a, b) => a.stats.rank - b.stats.rank).slice(0, 10);
+  }, [teams, useSeasonData, prescoutRanking]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -675,8 +674,14 @@ export default function DashboardPage() {
                 subtitle="Per alliance"
               />
               <StatCard
-                label="Top OPR"
-                value={topOprTeam ? topOprTeam.stats.opr.totalPointsNp.toFixed(1) : "\u2014"}
+                label={useSeasonData ? "Top Season OPR" : "Top OPR"}
+                value={
+                  topOprTeam
+                    ? ("bestOpr" in topOprTeam
+                        ? (topOprTeam as import("@/lib/types").PrescoutRankedTeam).bestOpr.toFixed(1)
+                        : (topOprTeam as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp.toFixed(1))
+                    : "\u2014"
+                }
                 subtitle={
                   topOprTeam
                     ? `#${topOprTeam.teamNumber} ${topOprTeam.teamName}`
@@ -690,7 +695,7 @@ export default function DashboardPage() {
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
                   <h3 className="text-sm font-semibold text-zinc-200">
-                    Top 10 Teams
+                    {useSeasonData ? "Top 10 Season OPR" : "Top 10 Teams"}
                   </h3>
                   <Link
                     href="/leaderboard"
@@ -709,33 +714,45 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {top10.map((team, i) => (
-                        <tr
-                          key={team.teamNumber}
-                          className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 transition-colors cursor-pointer"
-                        >
-                          <td className="px-5 py-2.5 text-zinc-500 font-mono text-xs">
-                            {i + 1}
-                          </td>
-                          <td className="py-2.5">
-                            <span className="font-mono text-white text-xs mr-2">
-                              {team.teamNumber}
-                            </span>
-                            <span className="text-zinc-400 hidden sm:inline">
-                              {team.teamName}
-                            </span>
-                          </td>
-                          <td className="px-5 py-2.5 text-right font-mono text-white text-xs">
-                            {team.stats.opr.totalPointsNp.toFixed(1)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <AddToPickListButton
-                              team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.stats.opr.totalPointsNp }}
-                              size="xs"
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                      {top10.map((team, i) => {
+                        const isPsTeam = "bestOpr" in team;
+                        const opr = isPsTeam
+                          ? (team as import("@/lib/types").PrescoutRankedTeam).bestOpr.toFixed(1)
+                          : (team as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp.toFixed(1);
+                        return (
+                          <tr
+                            key={team.teamNumber}
+                            className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 transition-colors cursor-pointer"
+                          >
+                            <td className="px-5 py-2.5 text-zinc-500 font-mono text-xs">
+                              {i + 1}
+                            </td>
+                            <td className="py-2.5">
+                              <span className="font-mono text-white text-xs mr-2">
+                                {team.teamNumber}
+                              </span>
+                              <span className="text-zinc-400 hidden sm:inline">
+                                {team.teamName}
+                              </span>
+                            </td>
+                            <td className="px-5 py-2.5 text-right font-mono text-white text-xs">
+                              {opr}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <AddToPickListButton
+                                team={{
+                                  teamNumber: team.teamNumber,
+                                  teamName: team.teamName,
+                                  opr: isPsTeam
+                                    ? (team as import("@/lib/types").PrescoutRankedTeam).bestOpr
+                                    : (team as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp,
+                                }}
+                                size="xs"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

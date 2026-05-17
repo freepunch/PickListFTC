@@ -515,8 +515,9 @@ function PrescoutExpandedDetail({ team }: { team: PrescoutRankedTeam }) {
 // ── Main page ──
 
 export default function LeaderboardPage() {
-  const { teams, event, loading, selectedTeams, toggleTeamSelection, isPrescout, prescoutRanking, prescoutLoading } =
+  const { teams, event, loading, selectedTeams, toggleTeamSelection, isPrescout, prescoutRanking, prescoutLoading, dataSource } =
     useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [sortKey, setSortKey] = useState<string>("rank");
   const [sortAsc, setSortAsc] = useState(true);
@@ -635,9 +636,9 @@ export default function LeaderboardPage() {
   const isNumericCol = (key: string) =>
     key !== "name" && key !== "wlt" && key !== "trend";
 
-  const tabDefs = isPrescout ? PRESCOUT_TABS : TABS;
-  const displayData = isPrescout ? psSorted : sorted;
-  const displayColumns = isPrescout ? psColumns : columns;
+  const tabDefs = useSeasonData ? PRESCOUT_TABS : TABS;
+  const displayData = useSeasonData ? psSorted : sorted;
+  const displayColumns = useSeasonData ? psColumns : columns;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -645,7 +646,7 @@ export default function LeaderboardPage() {
       <PrescoutBanner />
 
       <div className="flex-1 p-4 sm:p-6 pb-24">
-        {(loading || (isPrescout && prescoutLoading)) && <SkeletonTable />}
+        {(loading || (useSeasonData && prescoutLoading)) && <SkeletonTable />}
 
         {!event && !loading && (
           <div className="flex flex-col items-center justify-center py-32 text-center">
@@ -662,7 +663,7 @@ export default function LeaderboardPage() {
           </div>
         )}
 
-        {event && !loading && !(isPrescout && prescoutLoading) && (
+        {event && !loading && !(useSeasonData && prescoutLoading) && (
           <div className="space-y-4">
             {/* Tab bar */}
             <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto scrollbar-hide">
@@ -739,11 +740,19 @@ export default function LeaderboardPage() {
             <p className="text-xs text-zinc-600">
               {displayData.length} team{displayData.length !== 1 ? "s" : ""}
               {search && ` matching "${search}"`}
-              {isPrescout && " \u00b7 Season data"}
+              {useSeasonData ? " \u00b7 Season data" : " \u00b7 Event day data"}
             </p>
+            {!useSeasonData && !isPrescout && teams.some((t) => t.stats.qualMatchesPlayed > 0 && t.stats.qualMatchesPlayed < 3) && (
+              <p className="text-[10px] text-amber-400/70 flex items-center gap-1">
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                Some teams have fewer than 3 matches — stats may not be reliable yet
+              </p>
+            )}
 
             {/* Penalties tab — custom component, workspace-gated */}
-            {activeTab === "penalties" && !isPrescout && (
+            {activeTab === "penalties" && !useSeasonData && (
               <WorkspaceGate feature="Penalty Analytics" description="Create or join a workspace to access Penalty Analytics, Alliance Simulator, Draft Board, and more.">
                 <PenaltyLeaderboard
                   teams={sorted}
@@ -754,16 +763,16 @@ export default function LeaderboardPage() {
             )}
 
             {/* Table */}
-            {!(activeTab === "penalties" && !isPrescout) && (
+            {!(activeTab === "penalties" && !useSeasonData) && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-800">
-                      {!isPrescout && <th className="w-20 px-2 sm:px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
+                      {!useSeasonData && <th className="w-20 px-2 sm:px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
                       {displayColumns.map((col) => {
                         const isSorted = sortKey === col.key;
-                        const isSticky = col.key === "teamNumber" && !isPrescout;
+                        const isSticky = col.key === "teamNumber" && !useSeasonData;
                         const hideCls = col.hideOnMobile ? "hidden sm:table-cell" : "";
                         return (
                           <th
@@ -800,7 +809,7 @@ export default function LeaderboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {isPrescout ? (
+                    {useSeasonData ? (
                       // Prescout rows
                       (psSorted as PrescoutRankedTeam[]).map((team, i) => {
                         const isExpanded = expandedTeam === team.teamNumber;
