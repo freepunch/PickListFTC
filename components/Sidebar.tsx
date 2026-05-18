@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
-import { useWorkspace } from "@/context/WorkspaceContext";
+import { useWorkspace, useWorkspaceOptional } from "@/context/WorkspaceContext";
 
 // ── Nav data ──────────────────────────────────────────────────────────────────
 
@@ -402,6 +402,7 @@ function SignInButton({ collapsed }: { collapsed: boolean }) {
 function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSelectEvent?: () => void }) {
   const { favoriteEvents, toggleEventFav } = useFavorites();
   const { loadEvent, setEventCode, event: activeEvent } = useEvent();
+  const wsCtx = useWorkspaceOptional();
   const [expanded, setExpanded] = useState(true);
 
   function handleSelect(eventCode: string, eventName: string | null) {
@@ -415,7 +416,12 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
     onSelectEvent?.();
   }
 
-  if (favoriteEvents.length === 0 || collapsed) return null;
+  const wsEvents = wsCtx?.workspaceEvents ?? [];
+  const wsEventCodes = new Set(wsEvents.map((e) => e.event_code));
+  const personalOnly = favoriteEvents.filter((e) => !wsEventCodes.has(e.event_code));
+  const totalCount = wsEvents.length + personalOnly.length;
+
+  if (totalCount === 0 || collapsed) return null;
 
   return (
     <div data-tutorial="my-events-panel" className="border-t border-[var(--border)]">
@@ -431,10 +437,32 @@ function MyEventsPanel({ collapsed, onSelectEvent }: { collapsed: boolean; onSel
 
       {expanded && (
         <div className="px-2 pb-2 space-y-0.5 max-h-[200px] overflow-y-auto">
-          {favoriteEvents.map((ev) => {
+          {/* Workspace events — shown first with a team badge */}
+          {wsEvents.map((ev) => {
+            const status = getEventStatus(ev.event_start ?? undefined);
+            const isActive = activeEvent?.code === ev.event_code;
+            return (
+              <button
+                type="button"
+                key={`ws-${ev.event_code}`}
+                onClick={() => handleSelect(ev.event_code, ev.event_name ?? null)}
+                className={`group w-full flex items-center gap-2 px-2 py-2 min-h-[44px] rounded-md text-xs transition-colors text-left ${
+                  isActive ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 active:bg-zinc-800"
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+                <span className="flex-1 truncate min-w-0">{ev.event_name ?? ev.event_code}</span>
+                <span className="shrink-0 text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-[var(--accent-muted)] text-[var(--accent)] font-semibold">
+                  Team
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Personal favorites not already in workspace */}
+          {personalOnly.map((ev) => {
             const status = getEventStatus(ev.start);
             const isActive = activeEvent?.code === ev.event_code;
-
             return (
               <button
                 type="button"

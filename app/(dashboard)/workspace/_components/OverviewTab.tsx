@@ -1,26 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useEvent } from "@/context/EventContext";
 import {
+  WorkspaceEvent,
   describeActivity,
   formatExpiry,
   formatRelative,
   loadActivity,
   loadWorkspacePickLists,
   loadMatchAssignments,
+  addWorkspaceEvent,
+  updateWorkspaceEventNotes,
+  removeWorkspaceEvent,
   WorkspaceActivity,
   MatchAssignment,
 } from "@/lib/workspace";
+import { EventPickerDialog } from "@/components/EventPickerDialog";
 
 export function OverviewTab() {
-  const { workspace, members, notes, isExpired, daysUntilExpiry } = useWorkspace();
-  const { event } = useEvent();
+  const { user } = useAuth();
+  const {
+    workspace,
+    members,
+    notes,
+    workspaceEvents,
+    refreshWorkspaceEvents,
+    role,
+    isExpired,
+    daysUntilExpiry,
+  } = useWorkspace();
+  const { event, loadEvent, setDataSource } = useEvent();
+  const router = useRouter();
   const [activity, setActivity] = useState<WorkspaceActivity[]>([]);
   const [pickListEvents, setPickListEvents] = useState<number>(0);
   const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]);
   const [copyToast, setCopyToast] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addingEvent, setAddingEvent] = useState(false);
+
+  const canEdit = role === "admin" || role === "editor";
+  const isAdmin = role === "admin";
 
   useEffect(() => {
     if (!workspace) return;
@@ -149,6 +172,22 @@ export function OverviewTab() {
         );
       })()}
 
+      <TeamEventsSection
+        workspace={workspace}
+        workspaceEvents={workspaceEvents}
+        canEdit={canEdit}
+        isAdmin={isAdmin}
+        user={user}
+        loadEvent={loadEvent}
+        setDataSource={setDataSource}
+        router={router}
+        pickerOpen={pickerOpen}
+        setPickerOpen={setPickerOpen}
+        addingEvent={addingEvent}
+        setAddingEvent={setAddingEvent}
+        refreshWorkspaceEvents={refreshWorkspaceEvents}
+      />
+
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">
@@ -213,6 +252,240 @@ export function OverviewTab() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function getEventStatus(start: string | null): "live" | "upcoming" | "completed" {
+  if (!start) return "upcoming";
+  const now = new Date();
+  const s = new Date(start);
+  const e = new Date(start);
+  e.setDate(e.getDate() + 1);
+  e.setHours(23, 59, 59, 999);
+  if (now < s) return "upcoming";
+  if (now > e) return "completed";
+  return "live";
+}
+
+interface TeamEventsSectionProps {
+  workspace: { id: string } | null;
+  workspaceEvents: WorkspaceEvent[];
+  canEdit: boolean;
+  isAdmin: boolean;
+  user: { id: string } | null;
+  loadEvent: (code: string) => Promise<void>;
+  setDataSource: (s: "season" | "event") => void;
+  router: ReturnType<typeof useRouter>;
+  pickerOpen: boolean;
+  setPickerOpen: (v: boolean) => void;
+  addingEvent: boolean;
+  setAddingEvent: (v: boolean) => void;
+  refreshWorkspaceEvents: () => Promise<void>;
+}
+
+function EventNoteField({
+  event,
+  canEdit,
+}: {
+  event: WorkspaceEvent;
+  canEdit: boolean;
+}) {
+  const [draft, setDraft] = useState(event.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const prevRef = useRef(event.notes ?? "");
+
+  const handleBlur = async () => {
+    if (draft === prevRef.current) return;
+    setSaving(true);
+    await updateWorkspaceEventNotes(event.id, draft);
+    prevRef.current = draft;
+    setSaving(false);
+  };
+
+  if (!canEdit) {
+    return event.notes ? (
+      <p className="text-xs text-[var(--foreground-muted)] italic mt-1">&ldquo;{event.notes}&rdquo;</p>
+    ) : null;
+  }
+
+  return (
+    <div className="mt-1.5 relative">
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={handleBlur}
+        rows={1}
+        placeholder="Add a team note… (e.g. 'Our qualifier' or 'Prescout priority')"
+        className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground-muted)] placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] resize-none"
+      />
+      {saving && (
+        <span className="absolute right-2 top-1.5 text-[10px] text-zinc-600">saving…</span>
+      )}
+    </div>
+  );
+}
+
+function TeamEventsSection({
+  workspace,
+  workspaceEvents,
+  canEdit,
+  isAdmin,
+  user,
+  loadEvent,
+  setDataSource,
+  router,
+  pickerOpen,
+  setPickerOpen,
+  addingEvent,
+  setAddingEvent,
+  refreshWorkspaceEvents,
+}: TeamEventsSectionProps) {
+  if (!workspace) return null;
+
+  const handleAdd = async (result: {
+    code: string;
+    name: string;
+    start: string;
+    location?: { city?: string; state?: string };
+  }) => {
+    if (!user) return;
+    const already = workspaceEvents.some((e) => e.event_code === result.code);
+    if (already) return;
+    setAddingEvent(true);
+    const loc = [result.location?.city, result.location?.state].filter(Boolean).join(", ");
+    await addWorkspaceEvent(workspace.id, user.id, {
+      event_code: result.code,
+      event_name: result.name,
+      event_start: result.start,
+      event_location: loc || null,
+    });
+    await refreshWorkspaceEvents();
+    setAddingEvent(false);
+  };
+
+  const handleRemove = async (ev: WorkspaceEvent) => {
+    await removeWorkspaceEvent(ev.id);
+    await refreshWorkspaceEvents();
+  };
+
+  const handleLoad = async (code: string) => {
+    await loadEvent(code);
+    router.push("/dashboard");
+  };
+
+  const handlePrescout = async (code: string) => {
+    await loadEvent(code);
+    setDataSource("season");
+    router.push("/leaderboard");
+  };
+
+  const STATUS_DOT: Record<string, string> = {
+    live: "bg-green-500",
+    upcoming: "bg-yellow-400",
+    completed: "bg-zinc-600",
+  };
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">Team Events</h3>
+        {canEdit && (
+          <button
+            onClick={() => setPickerOpen(true)}
+            disabled={addingEvent}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-[var(--bg-card-hover)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
+          >
+            {addingEvent ? (
+              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            )}
+            Add Event
+          </button>
+        )}
+      </div>
+
+      {workspaceEvents.length === 0 ? (
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-5 py-6 text-xs text-[var(--foreground-dim)] text-center">
+          {canEdit
+            ? "No team events yet — add your first upcoming competition."
+            : "No team events added yet."}
+        </div>
+      ) : (
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+          {workspaceEvents.map((ev) => {
+            const status = getEventStatus(ev.event_start);
+            return (
+              <div key={ev.id} className="p-4">
+                <div className="flex items-start gap-3">
+                  <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                        {ev.event_name ?? ev.event_code}
+                      </span>
+                      <span className="font-mono text-[11px] text-[var(--foreground-dim)] shrink-0">
+                        {ev.event_code}
+                      </span>
+                    </div>
+                    {(ev.event_start || ev.event_location) && (
+                      <p className="text-xs text-[var(--foreground-dim)] mt-0.5">
+                        {ev.event_start &&
+                          new Date(ev.event_start).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        {ev.event_start && ev.event_location && " · "}
+                        {ev.event_location}
+                      </p>
+                    )}
+                    <EventNoteField event={ev} canEdit={canEdit} />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => handleLoad(ev.event_code)}
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white transition-colors"
+                      >
+                        Load Event
+                      </button>
+                      <button
+                        onClick={() => handlePrescout(ev.event_code)}
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-[var(--bg-card-hover)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+                      >
+                        Prescout
+                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleRemove(ev)}
+                          className="ml-auto p-1 text-zinc-600 hover:text-red-400 transition-colors"
+                          title="Remove event"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pickerOpen && (
+        <EventPickerDialog
+          onSelect={handleAdd}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

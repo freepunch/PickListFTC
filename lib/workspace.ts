@@ -906,6 +906,130 @@ export async function deleteMatchAssignment(id: string): Promise<void> {
   await supabase.from("workspace_match_assignments").delete().eq("id", id);
 }
 
+// ── Workspace Events ─────────────────────────────────────────────────────────
+
+export interface WorkspaceEvent {
+  id: string;
+  workspace_id: string;
+  event_code: string;
+  event_name: string | null;
+  event_start: string | null;
+  event_location: string | null;
+  added_by: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface EventPrepSummary {
+  event_code: string;
+  notesCount: number;
+  pickListStarted: boolean;
+  assignmentCount: number;
+}
+
+export async function loadWorkspaceEvents(workspaceId: string): Promise<WorkspaceEvent[]> {
+  const { data, error } = await supabase
+    .from("workspace_events")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("event_start", { ascending: true });
+  if (error || !data) return [];
+  return data as WorkspaceEvent[];
+}
+
+export async function addWorkspaceEvent(
+  workspaceId: string,
+  addedBy: string,
+  event: {
+    event_code: string;
+    event_name: string | null;
+    event_start: string | null;
+    event_location: string | null;
+  }
+): Promise<WorkspaceEvent | null> {
+  const { data, error } = await supabase
+    .from("workspace_events")
+    .insert({
+      workspace_id: workspaceId,
+      added_by: addedBy,
+      event_code: event.event_code,
+      event_name: event.event_name,
+      event_start: event.event_start,
+      event_location: event.event_location,
+      notes: null,
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return data as WorkspaceEvent;
+}
+
+export async function updateWorkspaceEventNotes(
+  eventId: string,
+  notes: string
+): Promise<void> {
+  await supabase
+    .from("workspace_events")
+    .update({ notes: notes.trim() || null })
+    .eq("id", eventId);
+}
+
+export async function removeWorkspaceEvent(eventId: string): Promise<void> {
+  await supabase.from("workspace_events").delete().eq("id", eventId);
+}
+
+export async function loadEventPrepSummaries(
+  workspaceId: string,
+  eventCodes: string[]
+): Promise<Map<string, EventPrepSummary>> {
+  if (!eventCodes.length) return new Map();
+
+  const [notesRes, pickListRes, assignRes] = await Promise.all([
+    supabase
+      .from("workspace_notes")
+      .select("event_code")
+      .eq("workspace_id", workspaceId)
+      .in("event_code", eventCodes),
+    supabase
+      .from("workspace_pick_lists")
+      .select("event_code, list_data")
+      .eq("workspace_id", workspaceId)
+      .in("event_code", eventCodes),
+    supabase
+      .from("workspace_scouting_assignments")
+      .select("event_code")
+      .eq("workspace_id", workspaceId)
+      .in("event_code", eventCodes),
+  ]);
+
+  const notesCountMap = new Map<string, number>();
+  for (const n of notesRes.data ?? []) {
+    notesCountMap.set(n.event_code, (notesCountMap.get(n.event_code) ?? 0) + 1);
+  }
+
+  const pickListMap = new Map<string, boolean>();
+  for (const pl of pickListRes.data ?? []) {
+    const entries = (pl.list_data as WorkspacePickListData)?.entries ?? [];
+    pickListMap.set(pl.event_code, entries.length > 0);
+  }
+
+  const assignCountMap = new Map<string, number>();
+  for (const a of assignRes.data ?? []) {
+    assignCountMap.set(a.event_code, (assignCountMap.get(a.event_code) ?? 0) + 1);
+  }
+
+  const result = new Map<string, EventPrepSummary>();
+  for (const code of eventCodes) {
+    result.set(code, {
+      event_code: code,
+      notesCount: notesCountMap.get(code) ?? 0,
+      pickListStarted: pickListMap.get(code) ?? false,
+      assignmentCount: assignCountMap.get(code) ?? 0,
+    });
+  }
+  return result;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function describeActivity(a: WorkspaceActivity): string {

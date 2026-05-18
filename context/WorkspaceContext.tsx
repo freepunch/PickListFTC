@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import {
   Workspace,
+  WorkspaceEvent,
   WorkspaceMember,
   WorkspaceNote,
   WorkspaceRole,
@@ -22,6 +23,7 @@ import {
   listMembers,
   loadWorkspaceNotes,
   loadSuggestions,
+  loadWorkspaceEvents,
 } from "@/lib/workspace";
 
 interface WorkspaceContextValue {
@@ -33,11 +35,13 @@ interface WorkspaceContextValue {
   role: WorkspaceRole | null;
   members: WorkspaceMember[];
   notes: WorkspaceNote[];
+  workspaceEvents: WorkspaceEvent[];
   pendingSuggestions: WorkspaceSuggestion[];
   refresh: () => Promise<void>;
   refreshNotes: () => Promise<void>;
   refreshSuggestions: () => Promise<void>;
   refreshMembers: () => Promise<void>;
+  refreshWorkspaceEvents: () => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -50,6 +54,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [notes, setNotes] = useState<WorkspaceNote[]>([]);
   const [pendingSuggestions, setPendingSuggestions] = useState<WorkspaceSuggestion[]>([]);
+  const [workspaceEvents, setWorkspaceEvents] = useState<WorkspaceEvent[]>([]);
   const subscribedWorkspaceRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
@@ -70,6 +75,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setPendingSuggestions(s.filter((x) => x.status === "pending"));
   }, [workspace]);
 
+  const refreshWorkspaceEvents = useCallback(async () => {
+    if (!workspace) return;
+    setWorkspaceEvents(await loadWorkspaceEvents(workspace.id));
+  }, [workspace]);
+
   const isExpired = useMemo(() => {
     if (!workspace?.expires_at) return false;
     return new Date(workspace.expires_at).getTime() < Date.now();
@@ -87,6 +97,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setRole(null);
       setMembers([]);
       setNotes([]);
+      setWorkspaceEvents([]);
       setPendingSuggestions([]);
       setLoading(false);
       return;
@@ -98,19 +109,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setRole(null);
       setMembers([]);
       setNotes([]);
+      setWorkspaceEvents([]);
       setPendingSuggestions([]);
       setLoading(false);
       return;
     }
     setWorkspace(result.workspace);
     setRole(result.role);
-    const [m, n, sugg] = await Promise.all([
+    const [m, n, sugg, evts] = await Promise.all([
       listMembers(result.workspace.id),
       loadWorkspaceNotes(result.workspace.id),
       loadSuggestions(result.workspace.id),
+      loadWorkspaceEvents(result.workspace.id),
     ]);
     setMembers(m);
     setNotes(n);
+    setWorkspaceEvents(evts);
     setPendingSuggestions(sugg.filter((x) => x.status === "pending"));
     setLoading(false);
   }, [userId]);
@@ -169,6 +183,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .on(
         "postgres_changes",
         {
+          event: "*",
+          schema: "public",
+          table: "workspace_events",
+          filter: `workspace_id=eq.${workspace.id}`,
+        },
+        () => {
+          refreshWorkspaceEvents();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
           event: "UPDATE",
           schema: "public",
           table: "workspaces",
@@ -202,11 +228,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         role,
         members,
         notes,
+        workspaceEvents,
         pendingSuggestions,
         refresh,
         refreshNotes,
         refreshSuggestions,
         refreshMembers,
+        refreshWorkspaceEvents,
       }}
     >
       {children}

@@ -12,8 +12,9 @@ import { PickListsTab } from "./_components/PickListsTab";
 import { MembersTab } from "./_components/MembersTab";
 import { AdminSettingsModal } from "./_components/AdminSettingsModal";
 import { ScoutingBoard } from "./_components/ScoutingBoard";
+import { SeasonPlanTab } from "./_components/SeasonPlanTab";
 
-type TabId = "overview" | "notes" | "picklists" | "members" | "scouting";
+type TabId = "overview" | "notes" | "picklists" | "members" | "scouting" | "season";
 
 export default function WorkspacePage() {
   const { user, loading: authLoading } = useAuth();
@@ -134,6 +135,7 @@ export default function WorkspacePage() {
             },
             { id: "members", label: "Members" },
             { id: "scouting", label: "Scouting" },
+            { id: "season", label: "Season Plan" },
           ] as { id: TabId; label: string; badge?: number }[]
         ).map((t) => (
           <button
@@ -190,6 +192,7 @@ export default function WorkspacePage() {
         {tab === "picklists" && <PickListsTab />}
         {tab === "members" && <MembersTab />}
         {tab === "scouting" && <ScoutingBoard />}
+        {tab === "season" && <SeasonPlanTab />}
       </div>
 
       {showSettings && (
