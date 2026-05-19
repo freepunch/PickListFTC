@@ -137,6 +137,16 @@ body {
   animation: slide-in 0.2s ease-out;
 }
 
+/* Match score flash (auto-refresh new result) */
+@keyframes flash-score {
+  0%   { background-color: rgb(234 179 8 / 0.18); }
+  60%  { background-color: rgb(234 179 8 / 0.10); }
+  100% { background-color: transparent; }
+}
+.animate-flash-score {
+  animation: flash-score 2.4s ease-out;
+}
+
 .skeleton {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
   background-color: var(--border);

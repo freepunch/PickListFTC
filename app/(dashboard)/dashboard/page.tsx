@@ -14,6 +14,8 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
 import { findScopedKeys } from "@/lib/storage";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useMatchNotifications } from "@/hooks/useMatchNotifications";
 
 function SkeletonCard() {
   return (
@@ -254,6 +256,79 @@ function PrescoutDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Live refresh bar ──
+
+function LiveRefreshBar() {
+  const { isLive, isComplete, newMatchCount, lastUpdatedText, isRefreshing, refresh } =
+    useAutoRefresh();
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (newMatchCount > 0) {
+      setToast(`${newMatchCount} new score${newMatchCount !== 1 ? "s" : ""} available`);
+      const t = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [newMatchCount]);
+
+  if (!isLive && !isComplete) return null;
+
+  return (
+    <>
+      {toast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-5 py-3 shadow-2xl text-sm text-[var(--foreground)] flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+            {toast}
+          </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 bg-[var(--bg-card)] border-b border-[var(--border)] text-xs text-[var(--foreground-dim)]">
+        <div className="flex items-center gap-2">
+          {isLive && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+              <span className="text-green-400 font-medium">Live</span>
+            </span>
+          )}
+          {isComplete && (
+            <span className="text-zinc-500">Event complete · auto-refresh off</span>
+          )}
+          {lastUpdatedText && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span>Updated {lastUpdatedText}</span>
+            </>
+          )}
+        </div>
+        {isLive && (
+          <button
+            onClick={refresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--bg-card-hover)] transition-colors disabled:opacity-40"
+            title="Refresh now"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+            Refresh
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -575,6 +650,7 @@ export default function DashboardPage() {
   const { event, teams, loading, isPrescout, dataSource, prescoutRanking, prescoutLoading } = useEvent();
   const useSeasonData = isPrescout || dataSource === 'season';
   const { profile } = useAuth();
+  useMatchNotifications();
 
   // "/" keyboard shortcut to focus event search
   useEffect(() => {
@@ -629,6 +705,7 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col">
       <EventLoader />
       <PrescoutBanner />
+      <LiveRefreshBar />
 
       <div className="flex-1 p-4 sm:p-6">
         <MyEventsSection />

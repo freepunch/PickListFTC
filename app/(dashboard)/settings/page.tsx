@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useNotes } from "@/context/NotesContext";
 import { useTheme, type Theme } from "@/context/ThemeContext";
+import { NOTIF_PREF_KEYS, getPref } from "@/hooks/useMatchNotifications";
 
 const APP_VERSION = "1.0";
 
@@ -50,8 +51,18 @@ export default function SettingsPage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Notification preferences
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
+  const [notifMyMatches, setNotifMyMatches] = useState(true);
+  const [notifPickList, setNotifPickList] = useState(true);
+  const [notifUpsets, setNotifUpsets] = useState(false);
+
   useEffect(() => {
     setIsMac(typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC"));
+    if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
+    setNotifMyMatches(getPref(NOTIF_PREF_KEYS.myMatches, true));
+    setNotifPickList(getPref(NOTIF_PREF_KEYS.pickListMatches, true));
+    setNotifUpsets(getPref(NOTIF_PREF_KEYS.upsetAlerts, false));
   }, []);
 
   // Sync team field from profile
@@ -225,6 +236,112 @@ export default function SettingsPage() {
               Sign in to save your team number across devices.
             </p>
           )}
+        </SectionCard>
+
+        {/* Notifications */}
+        <SectionCard title="Notifications">
+          {/* Permission row */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--foreground)]">Browser notifications</p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {notifPermission === "granted"
+                  ? "Notifications are enabled"
+                  : notifPermission === "denied"
+                  ? "Notifications blocked — update in browser settings"
+                  : "Allow PickListFTC to send match alerts"}
+              </p>
+            </div>
+            {notifPermission !== "granted" && notifPermission !== "denied" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (typeof Notification === "undefined") return;
+                  const result = await Notification.requestPermission();
+                  setNotifPermission(result);
+                  if (result === "granted") setToast("Notifications enabled");
+                }}
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors shrink-0"
+              >
+                Enable
+              </button>
+            )}
+            {notifPermission === "granted" && (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-400 shrink-0 pt-0.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                On
+              </span>
+            )}
+            {notifPermission === "denied" && (
+              <span className="text-xs text-red-400 shrink-0 pt-0.5">Blocked</span>
+            )}
+          </div>
+
+          {/* Toggles */}
+          {(
+            [
+              {
+                key: NOTIF_PREF_KEYS.myMatches,
+                label: "My match results",
+                description: "Alert when your team completes a match",
+                value: notifMyMatches,
+                set: setNotifMyMatches,
+                defaultVal: true,
+              },
+              {
+                key: NOTIF_PREF_KEYS.pickListMatches,
+                label: "Pick list team results",
+                description: "Alert when a team on your pick list plays",
+                value: notifPickList,
+                set: setNotifPickList,
+                defaultVal: true,
+              },
+              {
+                key: NOTIF_PREF_KEYS.upsetAlerts,
+                label: "Upset alerts",
+                description: "Alert when a large scoring upset occurs",
+                value: notifUpsets,
+                set: setNotifUpsets,
+                defaultVal: false,
+              },
+            ] as {
+              key: string;
+              label: string;
+              description: string;
+              value: boolean;
+              set: (v: boolean) => void;
+              defaultVal: boolean;
+            }[]
+          ).map((pref) => (
+            <div key={pref.key} className="border-t border-[var(--border)] pt-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--foreground)]">{pref.label}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{pref.description}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={pref.value}
+                onClick={() => {
+                  const next = !pref.value;
+                  pref.set(next);
+                  localStorage.setItem(pref.key, String(next));
+                }}
+                disabled={notifPermission !== "granted"}
+                className={`relative shrink-0 w-10 h-5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed ${
+                  pref.value ? "bg-[var(--accent)]" : "bg-zinc-700"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                    pref.value ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
         </SectionCard>
 
         {/* Data */}

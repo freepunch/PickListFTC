@@ -18,6 +18,7 @@ import {
   upsertMatchAssignment,
   deleteMatchAssignment,
 } from "@/lib/workspace";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 // ── Win probability ──
 const WIN_K = 20 / Math.log(0.85 / 0.15);
@@ -1469,6 +1470,8 @@ export default function SchedulePage() {
   const [filterDefaulted, setFilterDefaulted] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
 
+  const { newMatchIds } = useAutoRefresh();
+
   // Match assignments (workspace feature)
   const [assignments, setAssignments] = useState<MatchAssignment[]>([]);
 
@@ -2254,7 +2257,7 @@ export default function SchedulePage() {
                                 onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
                                 className={`border-b border-zinc-800/50 last:border-0 cursor-pointer hover:bg-zinc-800/40 transition-colors ${rowAccent} ${
                                   dimmed ? "opacity-60" : ""
-                                } ${isOnDeck ? "h-16" : ""}`}
+                                } ${isOnDeck ? "h-16" : ""} ${newMatchIds.has(m.id) ? "animate-flash-score" : ""}`}
                               >
                                 <td className="px-4 py-3">
                                   <span
@@ -2454,7 +2457,7 @@ export default function SchedulePage() {
                         <div
                           ref={m.id === scrollTargetId ? scrollTargetMobileRef : undefined}
                           onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
-                          className={cardClasses}
+                          className={`${cardClasses}${newMatchIds.has(m.id) ? " animate-flash-score" : ""}`}
                         >
                           <div className="flex items-center justify-between mb-2.5">
                             <div className="flex items-center gap-2">
