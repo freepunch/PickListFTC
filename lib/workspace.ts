@@ -946,22 +946,30 @@ export async function addWorkspaceEvent(
     event_start: string | null;
     event_location: string | null;
   }
-): Promise<WorkspaceEvent | null> {
+): Promise<{ data: WorkspaceEvent | null; error: string | null }> {
+  const payload = {
+    workspace_id: workspaceId,
+    added_by: addedBy,
+    event_code: event.event_code,
+    event_name: event.event_name,
+    event_start: event.event_start,
+    event_location: event.event_location,
+    notes: null,
+  };
+  console.log("[WS EVENTS] Inserting:", payload);
+
   const { data, error } = await supabase
     .from("workspace_events")
-    .insert({
-      workspace_id: workspaceId,
-      added_by: addedBy,
-      event_code: event.event_code,
-      event_name: event.event_name,
-      event_start: event.event_start,
-      event_location: event.event_location,
-      notes: null,
-    })
+    .insert(payload)
     .select()
     .single();
-  if (error || !data) return null;
-  return data as WorkspaceEvent;
+
+  console.log("[WS EVENTS] Result:", { data, error });
+  if (error) {
+    console.error("[WS EVENTS] Insert failed:", error);
+    return { data: null, error: error.message };
+  }
+  return { data: data as WorkspaceEvent, error: null };
 }
 
 export async function updateWorkspaceEventNotes(

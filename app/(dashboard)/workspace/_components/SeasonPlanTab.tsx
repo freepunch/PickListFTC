@@ -233,17 +233,23 @@ export function SeasonPlanTab() {
     start: string;
     location?: { city?: string; state?: string };
   }) => {
-    if (!user) return;
+    console.log("[WS EVENTS] Selected event:", result);
+    if (!user) { console.warn("[WS EVENTS] No user — aborting"); return; }
     const already = workspaceEvents.some((e) => e.event_code === result.code);
-    if (already) return;
+    if (already) { console.log("[WS EVENTS] Already in list, skipping"); return; }
     setAdding(true);
     const loc = [result.location?.city, result.location?.state].filter(Boolean).join(", ");
-    await addWorkspaceEvent(workspace.id, user.id, {
+    const { error } = await addWorkspaceEvent(workspace.id, user.id, {
       event_code: result.code,
       event_name: result.name,
       event_start: result.start,
       event_location: loc || null,
     });
+    if (error) {
+      console.error("[WS EVENTS] Save failed:", error);
+      setAdding(false);
+      return;
+    }
     await refreshWorkspaceEvents();
     setAdding(false);
   };
