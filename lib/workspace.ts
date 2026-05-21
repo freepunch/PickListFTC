@@ -933,6 +933,7 @@ export async function loadWorkspaceEvents(workspaceId: string): Promise<Workspac
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("event_start", { ascending: true });
+  console.log("[WS EVENTS] Loaded:", { data, error });
   if (error || !data) return [];
   return data as WorkspaceEvent[];
 }

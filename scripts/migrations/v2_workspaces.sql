@@ -351,3 +351,65 @@ CREATE POLICY "Editors delete match assignments" ON workspace_match_assignments 
       WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
     )
   );
+
+-- ── Workspace events (season calendar) ────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE NOT NULL,
+  event_code TEXT NOT NULL,
+  event_name TEXT,
+  event_start DATE,
+  event_location TEXT,
+  added_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_events_ws_idx
+  ON workspace_events (workspace_id, event_start);
+
+ALTER TABLE workspace_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read events" ON workspace_events;
+CREATE POLICY "Members read events" ON workspace_events FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors insert events" ON workspace_events;
+CREATE POLICY "Editors insert events" ON workspace_events FOR INSERT
+  WITH CHECK (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Editors update events" ON workspace_events;
+CREATE POLICY "Editors update events" ON workspace_events FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Admin deletes events" ON workspace_events;
+CREATE POLICY "Admin deletes events" ON workspace_events FOR DELETE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- Realtime: enable so all members see new events instantly (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'workspace_events'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE workspace_events;
+  END IF;
+END $$;
