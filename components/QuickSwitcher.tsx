@@ -160,12 +160,12 @@ export function QuickSwitcher() {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-lg max-h-[80vh] flex flex-col bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg max-h-[80vh] flex flex-col bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden animate-popover-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
-          <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)]">
+          <svg className="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <input
@@ -174,11 +174,11 @@ export function QuickSwitcher() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search events..."
+            placeholder="Search events…"
             maxLength={100}
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
           />
-          <kbd className="text-[10px] text-zinc-600 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 font-mono">
+          <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-card-hover)] border border-[var(--border)] rounded px-1.5 py-0.5 font-mono">
             ESC
           </kbd>
         </div>

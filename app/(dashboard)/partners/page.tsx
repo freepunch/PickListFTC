@@ -27,6 +27,7 @@ import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
 import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
+import { EmptyState } from "@/components/EmptyState";
 import { copyToClipboard } from "@/lib/clipboard";
 
 // ── Radar axes (same as compare view) ──
@@ -776,33 +777,29 @@ export default function PartnersPage() {
 
   if (!event) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-zinc-200 mb-1">No event loaded</h2>
-        <p className="text-sm text-zinc-500 max-w-xs">
-          Enter an FTC event code in the loader above to find the best alliance partners.
-        </p>
-      </div>
+      <EmptyState
+        title="Find your ideal alliance partner"
+        description="Load an event to see ranked compatibility scores across every team."
+      />
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <PrescoutBanner />
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6 flex-1">
+      <div className="p-4 sm:p-6 max-w-[1200px] mx-auto space-y-6 flex-1 w-full">
         {/* Header */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Partner Finder</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {useSeasonData
-              ? `Select your team to see ranked alliance partners based on season performance`
-              : `Select your team to see ranked alliance partners at ${event.name}`
-            }
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">
+              Partner Finder
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              {useSeasonData
+                ? `Ranked alliance partners based on season performance`
+                : `Ranked alliance partners at ${event.name}`}
+            </p>
+          </div>
         </div>
 
         {/* Team selector */}

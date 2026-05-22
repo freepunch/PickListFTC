@@ -23,6 +23,7 @@ import { useNotes } from "@/context/NotesContext";
 import { tagColorClass } from "@/lib/notes";
 import { useFavorites } from "@/context/FavoritesContext";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Tab / Column definitions (live mode) ──
 
@@ -642,45 +643,37 @@ export default function LeaderboardPage() {
   const displayColumns = useSeasonData ? psColumns : columns;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <EventLoader />
       <PrescoutBanner />
 
-      <div className="flex-1 p-4 sm:p-6 pb-24">
+      <div className="flex-1 p-4 sm:p-6 pb-24 max-w-[1200px] mx-auto w-full">
         {(loading || (useSeasonData && prescoutLoading)) && <SkeletonTable />}
 
         {!event && !loading && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-zinc-200 mb-2">Leaderboard</h2>
-            <p className="text-sm text-zinc-500">Load an event to see team rankings</p>
-            <p className="hidden md:block text-xs text-zinc-600 mt-3">
-              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">1</kbd>-<kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">5</kbd> to switch tabs
-            </p>
-          </div>
+          <EmptyState
+            title="Ranked team performance, at a glance"
+            description="Load an event to see live OPR, scoring, and ranking tables. Press 1–5 to switch tabs once it's loaded."
+          />
         )}
 
         {event && !loading && !(useSeasonData && prescoutLoading) && (
           <div className="space-y-4">
-            {/* Tab bar */}
-            <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto scrollbar-hide">
+            {/* Tab bar — minimal underline style */}
+            <div data-tutorial="stat-tabs" className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto scrollbar-hide">
               {tabDefs.map((tab, i) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 whitespace-nowrap ${
+                  className={`relative px-3 py-2.5 -mb-px text-sm font-medium transition-colors duration-150 whitespace-nowrap border-b-2 ${
                     activeTab === tab.id
-                      ? "bg-zinc-800 text-white shadow-sm"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      ? "border-[var(--accent)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   }`}
                 >
                   <span className="hidden sm:inline">{tab.label}</span>
                   <span className="sm:hidden">{tab.label.split("-")[0]}</span>
-                  <span className="ml-1.5 text-xs text-zinc-600 hidden lg:inline">{i + 1}</span>
+                  <span className="ml-1.5 text-xs text-[var(--text-muted)] hidden lg:inline">{i + 1}</span>
                 </button>
               ))}
             </div>

@@ -15,23 +15,29 @@ export function StatCard({
 }: StatCardProps) {
   const trendColor =
     trend === "up"
-      ? "text-emerald-400"
+      ? "text-[var(--success)]"
       : trend === "down"
-        ? "text-red-400"
-        : "text-zinc-500";
+        ? "text-[var(--danger)]"
+        : "text-[var(--text-muted)]";
 
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--border-hover)] transition-colors duration-150">
-      <p className="text-xs font-medium text-[var(--foreground-dim)] uppercase tracking-wider mb-1.5">
+    <div
+      className="group rounded-xl p-5 bg-[var(--bg-card)] border border-transparent
+        hover:border-[var(--border)] transition-all duration-200
+        hover:scale-[1.005]"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
         {label}
       </p>
       <p
-        className={`text-2xl font-semibold text-[var(--foreground)] ${mono ? "font-mono" : ""}`}
+        className={`mt-2 text-3xl font-bold text-[var(--text-primary)] tracking-tight ${
+          mono ? "font-mono" : "font-display"
+        }`}
       >
         {value}
       </p>
       {subtitle && (
-        <p className={`text-xs mt-1.5 ${trendColor}`}>{subtitle}</p>
+        <p className={`mt-2 text-xs ${trendColor}`}>{subtitle}</p>
       )}
     </div>
   );

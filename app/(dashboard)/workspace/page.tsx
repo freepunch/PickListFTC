@@ -70,11 +70,11 @@ export default function WorkspacePage() {
   const bannerCritical = isExpired;
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-start justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
+    <div className="flex flex-col h-full min-h-0 animate-page-fade-in">
+      <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-subtle)] shrink-0">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-[var(--foreground)]">
+            <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">
               {workspace.name}
             </h1>
             <span

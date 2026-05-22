@@ -19,6 +19,7 @@ import {
   deleteMatchAssignment,
 } from "@/lib/workspace";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Win probability ──
 const WIN_K = 20 / Math.log(0.85 / 0.15);
@@ -1931,22 +1932,17 @@ export default function SchedulePage() {
   // ── Render ──
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <EventLoader />
       <PrescoutBanner />
 
-      <div className="flex-1 p-4 sm:p-6 pb-24 space-y-4">
+      <div className="flex-1 p-4 sm:p-6 pb-24 space-y-4 max-w-[1400px] mx-auto w-full">
 
         {!event && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-zinc-200 mb-2">Schedule</h2>
-            <p className="text-sm text-zinc-500">Load an event to see the match schedule</p>
-          </div>
+          <EmptyState
+            title="Match schedule"
+            description="Load an event to see qualification and elimination matches with live scores and predictions."
+          />
         )}
 
         {event && (

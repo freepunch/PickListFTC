@@ -7,6 +7,7 @@ import { useWorkspaceOptional } from "@/context/WorkspaceContext";
 import { rankPartners, penaltyP75 } from "@/lib/calculations";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
+import { EmptyState } from "@/components/EmptyState";
 import { exportPickListPDF } from "@/lib/pdf-export";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
@@ -481,34 +482,22 @@ export default function PickListPage() {
 
   if (!event) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <svg
-          className="w-10 h-10 text-zinc-700"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.5}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-          />
-        </svg>
-        <p className="text-sm text-zinc-500">Load an event to build your pick list.</p>
-      </div>
+      <EmptyState
+        title="Build your pick list"
+        description="Load an event to start ranking teams and tracking who's been picked."
+      />
     );
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 animate-page-fade-in">
       {isPrescout && <PrescoutBanner />}
 
       {/* Page header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-subtle)] shrink-0">
         <div>
-          <h1 className="text-lg font-semibold text-white">Pick List Builder</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">{event.name}</p>
+          <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">Pick list</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">{event.name}</p>
         </div>
         <div className="flex items-center gap-2">
           {userId && syncStatus !== "idle" && (

@@ -95,7 +95,7 @@ export default function ProfilePage() {
     : null;
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
+    <div className="min-h-screen p-4 sm:p-6 animate-page-fade-in">
       <div className="max-w-lg mx-auto space-y-6">
         {/* Toast */}
         {toast && (

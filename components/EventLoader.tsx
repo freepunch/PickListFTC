@@ -13,7 +13,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useWorkspaceOptional } from "@/context/WorkspaceContext";
 import { searchEvents } from "@/lib/api";
 import { EventSearchResult } from "@/lib/types";
-import { ShareButton } from "@/components/SharePopover";
 import { recentEventsKey } from "@/lib/storage";
 
 // ── Global focus ───────────────────────────────────────────────────────────────
@@ -197,7 +196,7 @@ function EventResultRow({
       type="button"
       onClick={onClick}
       className={`w-full text-left px-3 py-2.5 min-h-[44px] flex items-start gap-2.5 transition-colors ${
-        highlighted ? "bg-zinc-800" : "hover:bg-zinc-800/60"
+        highlighted ? "bg-[var(--bg-card-hover)]" : "hover:bg-[var(--bg-card-hover)]/60"
       }`}
     >
       <span className="mt-[5px] shrink-0">
@@ -205,20 +204,20 @@ function EventResultRow({
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm text-white font-medium truncate leading-snug">
+          <span className="text-sm text-[var(--text-primary)] font-medium truncate leading-snug">
             {result.name}
           </span>
-          <span className="font-mono text-[11px] text-zinc-500 shrink-0">
+          <span className="font-mono text-[11px] text-[var(--text-muted)] shrink-0">
             {result.code}
           </span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-xs text-zinc-400">{formatDate(result.start)}</span>
+          <span className="text-xs text-[var(--text-secondary)]">{formatDate(result.start)}</span>
           {location && (
-            <span className="text-xs text-zinc-500">{location}</span>
+            <span className="text-xs text-[var(--text-muted)]">{location}</span>
           )}
           {result.type && (
-            <span className="text-[10px] font-medium text-zinc-600 bg-zinc-900 rounded px-1.5 py-0.5 border border-zinc-800">
+            <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-card)] rounded px-1.5 py-0.5 border border-[var(--border-subtle)]">
               {result.type}
             </span>
           )}
@@ -563,27 +562,22 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
   // In empty mode w/ no chip, default events start after recent in the nav list
   const defaultNavOffset = recent.length;
 
+  const hasTyped = eventCode.trim().length > 0;
+
   return (
     <div
       data-tutorial="event-loader"
       className={
-        bare ? "" : "bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-4"
+        bare ? "" : "border-b border-[var(--border-subtle)] px-4 sm:px-6 py-3"
       }
     >
       <form
         onSubmit={handleSubmit}
-        className="flex flex-wrap items-end gap-2 sm:gap-3"
+        className="flex items-center gap-2 sm:gap-3"
       >
         <div className="relative flex-1 min-w-0" ref={containerRef}>
-          <label className="block text-xs font-medium text-zinc-500 mb-1.5">
-            Event Code or Name
-          </label>
-
-          {/* Input */}
+          {/* Input — 48px tall, rounded-xl, no border until focus */}
           <div className="relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none">
-              <SearchIcon />
-            </div>
             <input
               ref={inputRef}
               type="text"
@@ -591,14 +585,14 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
               onChange={(e) => handleInputChange(e.target.value)}
               onFocus={handleFocus}
               onKeyDown={handleKeyDown}
-              placeholder="Search events by name, city, or code..."
+              placeholder="Search events by name, city, or code…"
               maxLength={100}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-9 py-2 text-sm text-white
-                placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
-                focus:ring-1 focus:ring-[var(--accent)]/30 w-full transition-colors"
+              className="bg-[var(--bg-card)] border border-transparent rounded-xl px-4 h-12 pr-10 text-[15px] text-[var(--text-primary)]
+                placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]
+                focus:ring-4 focus:ring-[var(--accent-subtle)] w-full transition-all"
             />
             {/* Right adornment */}
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
               {searching ? (
                 <Spinner />
               ) : mode === "empty" && !eventCode.trim() ? (
@@ -611,7 +605,8 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
                       inputRef.current?.focus();
                     }
                   }}
-                  className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  aria-label="Show suggestions"
                 >
                   <svg
                     className={`w-4 h-4 transition-transform duration-150 ${
@@ -635,13 +630,13 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
 
           {/* ── Dropdown panel ── */}
           {(showEmptyDropdown || showSearchDropdown) && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-2xl z-50 overflow-hidden animate-popover-in">
 
               {/* ── Empty mode ── */}
               {showEmptyDropdown && (
                 <>
                   {/* Filter chips — horizontally scrollable */}
-                  <div className="px-3 pt-3 pb-2.5 border-b border-zinc-800 overflow-x-auto">
+                  <div className="px-3 pt-3 pb-2.5 border-b border-[var(--border-subtle)] overflow-x-auto">
                     <div className="flex items-center gap-1.5 min-w-max">
                       {chips.map((chip) => (
                         <button
@@ -651,7 +646,7 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
                           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                             activeChip === chip.id
                               ? "bg-[var(--accent)] text-white shadow-sm"
-                              : "bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 hover:text-white"
+                              : "bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                           }`}
                         >
                           {chip.label}
@@ -696,20 +691,20 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
                                 onClick={() => selectEvent(entry.code)}
                                 className={`w-full text-left px-3 py-2.5 min-h-[44px] flex items-center justify-between gap-2 transition-colors ${
                                   highlightIdx === idx
-                                    ? "bg-zinc-800"
-                                    : "hover:bg-zinc-800/60"
+                                    ? "bg-[var(--bg-card-hover)]"
+                                    : "hover:bg-[var(--bg-card-hover)]/60"
                                 }`}
                               >
                                 <div className="min-w-0">
-                                  <p className="font-mono text-sm text-white leading-snug">
+                                  <p className="font-mono text-sm text-[var(--text-primary)] leading-snug">
                                     {entry.code}
                                   </p>
-                                  <p className="text-xs text-zinc-500 truncate">
+                                  <p className="text-xs text-[var(--text-muted)] truncate">
                                     {entry.name}
                                   </p>
                                 </div>
                                 <svg
-                                  className="w-3.5 h-3.5 text-zinc-600 shrink-0"
+                                  className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -802,13 +797,15 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
           )}
         </div>
 
-        {/* Load Event button */}
+        {/* Load Event — ghost until something is typed */}
         <button
           type="submit"
-          disabled={loading || !eventCode.trim()}
-          className="px-5 py-2 min-h-[42px] shrink-0 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40
-            disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all
-            duration-150 active:scale-[0.97] self-end"
+          disabled={loading || !hasTyped}
+          className={`px-4 h-12 shrink-0 text-sm font-medium rounded-xl transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed ${
+            hasTyped
+              ? "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white"
+              : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]"
+          }`}
         >
           {loading ? (
             <span className="flex items-center gap-2">
@@ -816,11 +813,9 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
               Loading
             </span>
           ) : (
-            "Load Event"
+            "Load"
           )}
         </button>
-
-        <ShareButton />
 
         {error && (
           <div className="flex items-center gap-2 text-sm text-[var(--danger)] self-center ml-2">
@@ -854,40 +849,32 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
       </form>
 
       {!bare && isInWorkspace && event && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800/60 flex-wrap">
-          <span className="text-xs text-zinc-500 shrink-0">Data source</span>
-          <div className="flex gap-0.5 p-0.5 bg-zinc-800 rounded-lg">
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] shrink-0">Source</span>
+          <div className="flex items-center gap-0.5">
             {(["season", "event"] as const).map((src) => (
               <button
                 key={src}
                 type="button"
                 onClick={() => setDataSource(src)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
                   dataSource === src
-                    ? "bg-[var(--accent)] text-white shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-[var(--accent-subtle)] text-[var(--accent)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]"
                 }`}
               >
-                {src === "season" ? "Season" : "Event Day"}
+                {src === "season" ? "Season" : "Event day"}
               </button>
             ))}
           </div>
           {prescoutLoading && dataSource === "season" && !isPrescout && (
-            <span className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+            <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
               <Spinner className="w-3 h-3" />
-              Loading season data…
+              Loading…
             </span>
           )}
           {dataSource === "event" && isPrescout && (
-            <span className="text-[10px] text-amber-400/70">
-              No event-day data yet · showing season data
-            </span>
-          )}
-          {dataSource === "season" && !isPrescout && !prescoutLoading && prescoutRanking.length > 0 && (
-            <span className="text-[10px] text-zinc-600">Season data active</span>
-          )}
-          {dataSource === "event" && !isPrescout && (
-            <span className="text-[10px] text-zinc-600">Event day data active</span>
+            <span className="text-[10px] text-[var(--warning)]/70">No event-day data yet</span>
           )}
         </div>
       )}

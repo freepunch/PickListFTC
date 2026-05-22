@@ -16,14 +16,13 @@ const SESSION_EXPIRED_KEY = "plftc:sessionExpired";
 
 function AuthLoadingScreen() {
   return (
-    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <h1 className="text-3xl font-extrabold tracking-tight">
-          <span className="text-white">Pick</span>
-          <span className="text-[var(--accent)]">List</span>
-          <span className="text-white">FTC</span>
+        <h1 className="font-display text-3xl tracking-tight">
+          <span className="font-semibold text-[var(--text-primary)]">PickList</span>
+          <span className="font-bold text-[var(--accent)]">FTC</span>
         </h1>
-        <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-[var(--border)] border-t-[var(--text-secondary)] rounded-full animate-spin" />
       </div>
     </div>
   );
@@ -130,18 +129,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)]">
+    <div className="flex min-h-screen bg-[var(--bg-primary)]">
       {/* Mobile top bar — visible only on <768px */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-2 bg-[var(--bg-card)] border-b border-[var(--border)] md:hidden">
-        <h1 className="text-lg font-bold text-white tracking-tight pl-2">
-          Pick<span className="text-[var(--accent)]">List</span>FTC
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-2 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] md:hidden">
+        <h1 className="font-display text-[15px] tracking-tight pl-2">
+          <span className="font-semibold text-[var(--text-primary)]">PickList</span>
+          <span className="font-bold text-[var(--accent)]">FTC</span>
         </h1>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
           aria-label="Open navigation"
           aria-expanded={mobileMenuOpen}
-          className="w-11 h-11 inline-flex items-center justify-center rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 active:bg-zinc-700 transition-colors"
+          className="w-11 h-11 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] active:bg-[var(--border)] transition-colors"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />

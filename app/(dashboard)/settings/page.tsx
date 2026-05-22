@@ -117,12 +117,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 pb-24">
+    <div className="min-h-screen p-4 sm:p-6 pb-24 animate-page-fade-in">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Toast */}
         {toast && (
           <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-5 py-3 shadow-2xl text-sm text-[var(--foreground)]">
+            <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-5 py-3 shadow-2xl text-sm text-[var(--text-primary)]">
               {toast}
             </div>
           </div>
@@ -130,8 +130,8 @@ export default function SettingsPage() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Settings</h1>
-          <p className="text-sm text-zinc-500 mt-1">Preferences, shortcuts, and account utilities.</p>
+          <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">Settings</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Preferences, shortcuts, and account utilities.</p>
         </div>
 
         {/* Appearance */}
