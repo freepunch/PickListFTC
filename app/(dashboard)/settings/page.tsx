@@ -7,7 +7,7 @@ import { useNotes } from "@/context/NotesContext";
 import { useTheme, type Theme } from "@/context/ThemeContext";
 import { NOTIF_PREF_KEYS, getPref } from "@/hooks/useMatchNotifications";
 
-const APP_VERSION = "1.0";
+const APP_VERSION = "2.0";
 
 function SectionCard({
   title,
