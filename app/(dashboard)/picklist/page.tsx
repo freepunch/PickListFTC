@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useEvent } from "@/context/EventContext";
 import { useAuth } from "@/context/AuthContext";
 import { useWorkspaceOptional } from "@/context/WorkspaceContext";
@@ -68,6 +69,8 @@ export default function PickListPage() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [availableSearch, setAvailableSearch] = useState("");
   const [mobileTab, setMobileTab] = useState<"available" | "picklist">("available");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Track which event code we've initialized for
   const loadedCodeRef = useRef<string | null>(null);
@@ -882,10 +885,12 @@ export default function PickListPage() {
         </div>
       </div>
 
-      {/* Clear confirmation modal */}
-      {showClearConfirm && (
+      {/* Clear confirmation modal — portaled to body so it escapes the
+          page wrapper's transformed containing block (animate-page-fade-in
+          applies a transform, which would otherwise contain `fixed`). */}
+      {mounted && showClearConfirm && createPortal(
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
           onClick={() => setShowClearConfirm(false)}
         >
           <div
@@ -915,7 +920,8 @@ export default function PickListPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
