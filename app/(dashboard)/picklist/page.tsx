@@ -606,7 +606,7 @@ export default function PickListPage() {
             onFocus={() => setMyTeamOpen(true)}
             onBlur={() => setTimeout(() => setMyTeamOpen(false), 150)}
             placeholder="Team # or name…"
-            className="w-52 bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]"
+            className="w-52 bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
           />
           {myTeamOpen && myTeamSuggestions.length > 0 && (
             <div className="absolute top-full left-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-20 py-1 max-h-48 overflow-y-auto">
@@ -704,7 +704,7 @@ export default function PickListPage() {
                 value={availableSearch}
                 onChange={(e) => setAvailableSearch(e.target.value)}
                 placeholder="Filter by # or name…"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-md pl-6 pr-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-md pl-6 pr-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               />
               {availableSearch && (
                 <button
@@ -1049,7 +1049,7 @@ function PickListRow({
         placeholder="notes…"
         onClick={(e) => e.stopPropagation()}
         onDragStart={(e) => e.stopPropagation()}
-        className="hidden sm:block w-36 bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 shrink-0"
+        className="hidden sm:block w-36 bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all shrink-0"
       />
 
       {/* Picked button */}
@@ -1098,7 +1098,7 @@ function PickListRow({
         onChange={(e) => onUpdateNotes(e.target.value)}
         placeholder="notes…"
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-2 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600"
+        className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded px-2 py-2 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
       />
     </div>
     </div>

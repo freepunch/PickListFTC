@@ -164,7 +164,7 @@ export function QuickSwitcher() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)] transition-all focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-0 focus-within:border-[var(--accent)]">
           <svg className="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>

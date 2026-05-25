@@ -697,8 +697,8 @@ export default function LeaderboardPage() {
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Filter by team # or name..."
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white
-                    placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700
-                    focus:ring-1 focus:ring-zinc-700/50 transition-colors"
+                    placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                    focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
                 {search && (
                   <button

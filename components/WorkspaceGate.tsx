@@ -138,7 +138,7 @@ export function WorkspaceGate({ feature, description, children }: WorkspaceGateP
               placeholder="6-char code"
               maxLength={6}
               autoFocus
-              className="w-32 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)] text-center uppercase tracking-widest"
+              className="w-32 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all text-center uppercase tracking-widest"
             />
             <button
               type="submit"

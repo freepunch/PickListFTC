@@ -317,7 +317,7 @@ function EventNoteField({
         onBlur={handleBlur}
         rows={1}
         placeholder="Add a team note… (e.g. 'Our qualifier' or 'Prescout priority')"
-        className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground-muted)] placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)] resize-none"
+        className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground-muted)] placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all resize-none"
       />
       {saving && (
         <span className="absolute right-2 top-1.5 text-[10px] text-zinc-600">saving…</span>

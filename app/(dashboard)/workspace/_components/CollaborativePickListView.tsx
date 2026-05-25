@@ -515,7 +515,7 @@ export function CollaborativePickListView({ list: initial, onClose }: Props) {
               maxLength={280}
               rows={3}
               placeholder="Optional reason (e.g. Strong endgame in the last two matches)"
-              className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)] resize-none mb-3"
+              className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all resize-none mb-3"
             />
             <div className="flex justify-end gap-2">
               <button
@@ -720,7 +720,7 @@ function SuggestAddBar({
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Suggest a team to add…"
-          className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+          className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
         />
         {open && matches.length > 0 && (
           <div className="absolute bottom-full left-0 right-0 mb-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl max-h-48 overflow-y-auto z-10">

@@ -212,7 +212,7 @@ export default function SettingsPage() {
                     setTeamDirty(true);
                   }}
                   placeholder="e.g. 21364"
-                  className="flex-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--foreground)] font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+                  className="flex-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--foreground)] font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
                 <button
                   type="button"

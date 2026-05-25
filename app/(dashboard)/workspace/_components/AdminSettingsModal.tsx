@@ -123,7 +123,7 @@ export function AdminSettingsModal({ onClose }: { onClose: () => void }) {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 80))}
-                  className="mt-1 w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)]"
+                  className="mt-1 w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
               </label>
               <label className="block">
@@ -136,7 +136,7 @@ export function AdminSettingsModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) =>
                     setTeam(e.target.value.replace(/\D/g, "").slice(0, 5))
                   }
-                  className="mt-1 w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] font-mono focus:outline-none focus:border-[var(--accent)]"
+                  className="mt-1 w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
               </label>
               <button
@@ -237,7 +237,7 @@ export function AdminSettingsModal({ onClose }: { onClose: () => void }) {
               type="text"
               value={deleteText}
               onChange={(e) => setDeleteText(e.target.value)}
-              className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-red-500 mb-3"
+              className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-0 focus:border-red-500 transition-all mb-3"
             />
             <div className="flex justify-end gap-2">
               <button

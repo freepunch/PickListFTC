@@ -56,7 +56,7 @@ export function NotesTab() {
         <select
           value={eventFilter}
           onChange={(e) => setEventFilter(e.target.value)}
-          className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)]"
+          className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
         >
           <option value="__all__">All events ({events.length})</option>
           {events.map((ev) => (
@@ -70,7 +70,7 @@ export function NotesTab() {
           value={teamQuery}
           onChange={(e) => setTeamQuery(e.target.value.replace(/\D/g, ""))}
           placeholder="Filter by team #"
-          className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)] w-32 font-mono"
+          className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all w-32 font-mono"
         />
         <span className="text-xs text-[var(--foreground-dim)]">
           {filtered.length} note{filtered.length === 1 ? "" : "s"}

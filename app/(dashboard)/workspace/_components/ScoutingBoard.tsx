@@ -629,7 +629,7 @@ function TeamCard({
               <select
                 value={reassignTarget}
                 onChange={(e) => setReassignTarget(e.target.value)}
-                className="text-[11px] bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--accent)]"
+                className="text-[11px] bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               >
                 <option value="">
                   {item.assigned_to ? "Reassign…" : "Assign to…"}

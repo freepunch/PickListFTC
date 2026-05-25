@@ -179,7 +179,7 @@ export function MembersTab() {
                         handleRoleChange(m.user_id, e.target.value as WorkspaceRole)
                       }
                       disabled={busy}
-                      className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                      className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all disabled:opacity-50"
                     >
                       {ROLE_OPTIONS.map((r) => (
                         <option key={r} value={r}>

@@ -92,7 +92,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
         }}
         placeholder="Observation about this team…"
         rows={2}
-        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)] resize-none"
+        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all resize-none"
       />
 
       {/* Predefined tag chips */}
@@ -130,7 +130,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
             }
           }}
           placeholder="Custom tag (Enter to add)…"
-          className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)]"
+          className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
         />
         <button
           type="button"

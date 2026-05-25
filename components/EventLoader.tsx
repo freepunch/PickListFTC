@@ -588,8 +588,8 @@ export function EventLoader({ bare = false }: { bare?: boolean } = {}) {
               placeholder="Search events by name, city, or code…"
               maxLength={100}
               className="bg-[var(--bg-card)] border border-transparent rounded-xl px-4 h-12 pr-10 text-[15px] text-[var(--text-primary)]
-                placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]
-                focus:ring-4 focus:ring-[var(--accent-subtle)] w-full transition-all"
+                placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                focus:ring-offset-0 focus:border-[var(--accent)] w-full transition-all"
             />
             {/* Right adornment */}
             <div className="absolute right-3 top-1/2 -translate-y-1/2">

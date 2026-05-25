@@ -206,7 +206,7 @@ function TeamPromptModal() {
           placeholder="e.g. 21364"
           autoFocus
           className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)]
-            font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] mb-4"
+            font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all mb-4"
         />
         <div className="flex gap-2 justify-end">
           <button onClick={dismissTeamPrompt} className="px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Skip</button>
@@ -611,7 +611,7 @@ function SidebarContent({
               onChange={(e) => setReportQuery(e.target.value)}
               placeholder="Team #"
               autoFocus
-              className="flex-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-[var(--text-primary)] font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] w-full"
+              className="flex-1 bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-[var(--text-primary)] font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all w-full"
             />
             <button type="submit" className="bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -61,7 +61,7 @@ export function CreateWorkspaceCard() {
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 80))}
             placeholder="e.g. First Try Scouting"
-            className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+            className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
           />
         </div>
         <div>
@@ -73,7 +73,7 @@ export function CreateWorkspaceCard() {
             value={team}
             onChange={(e) => setTeam(e.target.value.replace(/\D/g, "").slice(0, 5))}
             placeholder="21364"
-            className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+            className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-sm text-[var(--foreground)] font-mono placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
           />
         </div>
       </div>
@@ -131,7 +131,7 @@ export function JoinWorkspaceCard({
             if (e.key === "Enter") onSubmit();
           }}
           placeholder="FTR24X"
-          className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-base font-mono tracking-[0.3em] text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+          className="w-full bg-[var(--bg-card-hover)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-base font-mono tracking-[0.3em] text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
         />
       </div>
 

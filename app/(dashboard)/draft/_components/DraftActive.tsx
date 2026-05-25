@@ -271,7 +271,7 @@ export function DraftActive({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search team number or name…"
-                className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--accent)]"
+                className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               />
               <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg-card)] divide-y divide-[var(--border)]/40">
                 {filteredAvailable.slice(0, 25).map((t) => (

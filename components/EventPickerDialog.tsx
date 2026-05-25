@@ -78,7 +78,7 @@ export function EventPickerDialog({ onSelect, onClose }: Props) {
         className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 transition-all focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-0 focus-within:border-[var(--accent)]">
           <svg
             className="w-4 h-4 text-zinc-500 shrink-0"
             fill="none"

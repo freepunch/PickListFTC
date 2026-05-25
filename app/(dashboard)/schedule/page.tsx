@@ -2691,7 +2691,7 @@ function MatchScoutingSection({
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               >
                 <option value="">Select member…</option>
                 {members.map((m) => (
@@ -2808,7 +2808,7 @@ function MatchScoutingSection({
                   onChange={(e) => setReportText(e.target.value)}
                   placeholder="Observations from this match…"
                   rows={3}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all resize-none"
                 />
                 {reportError && <p className="text-xs text-red-400">{reportError}</p>}
                 <div className="flex gap-2">
