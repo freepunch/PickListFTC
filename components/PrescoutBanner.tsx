@@ -40,8 +40,8 @@ export function PrescoutBanner() {
   // Prescout mode: thin accent strip at top of content
   return (
     <div className="px-4 sm:px-6">
-      <div className="h-7 -mb-px flex items-center justify-between gap-3 px-3 rounded-md bg-[var(--accent-subtle)] border border-transparent">
-        <div className="flex items-center gap-2 text-[11px] text-[var(--accent)] font-medium tracking-wide">
+      <div className="py-1 -mb-px flex items-center justify-between gap-3 px-3 rounded-md bg-[var(--accent-subtle)] border border-transparent">
+        <div className="flex items-center gap-2 text-xs text-[var(--accent)] font-medium tracking-wide">
           <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
           Prescout · season data
         </div>

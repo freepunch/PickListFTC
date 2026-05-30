@@ -497,12 +497,12 @@ export default function PickListPage() {
       {isPrescout && <PrescoutBanner />}
 
       {/* Page header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-subtle)] shrink-0">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">Pick list</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">{event.name}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-3 sm:py-5 border-b border-[var(--border-subtle)] shrink-0">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-2xl font-semibold text-[var(--text-primary)] tracking-tight">Pick list</h1>
+          <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5 sm:mt-1 truncate">{event.name}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {userId && syncStatus !== "idle" && (
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               syncStatus === "syncing"
@@ -514,19 +514,22 @@ export default function PickListPage() {
           )}
           {entries.length > 0 && (
             <span className="text-xs text-zinc-400 bg-zinc-800 px-2.5 py-1 rounded-full border border-zinc-700">
-              {takenCount} of {allTeamData.length} teams picked
+              <span className="sm:hidden">{takenCount}/{allTeamData.length}</span>
+              <span className="hidden sm:inline">{takenCount} of {allTeamData.length} teams picked</span>
             </span>
           )}
           <div className="relative">
             <button
               onClick={handleCopyList}
               disabled={entries.filter((e) => !e.picked).length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
+              aria-label="Copy list"
+              title="Copy list"
+              className="flex items-center justify-center sm:justify-start gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-[18px] h-[18px] sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
               </svg>
-              Copy List
+              <span className="hidden sm:inline">Copy List</span>
             </button>
             {copyToast && (
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 pointer-events-none z-50">
@@ -537,10 +540,12 @@ export default function PickListPage() {
           <button
             onClick={exportPickList}
             disabled={entries.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
+            aria-label="Export"
+            title="Export"
+            className="flex items-center justify-center sm:justify-start gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
           >
             <svg
-              className="w-3.5 h-3.5"
+              className="w-[18px] h-[18px] sm:w-3.5 sm:h-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -552,52 +557,60 @@ export default function PickListPage() {
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
           {isInWorkspace ? (
             <button
               onClick={handleExportPDF}
               disabled={entries.length === 0 || pdfExporting}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
+              aria-label={pdfExporting ? "Generating PDF" : "Export PDF"}
+              title={pdfExporting ? "Generating PDF" : "Export PDF"}
+              className="flex items-center justify-center sm:justify-start gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700"
             >
               {pdfExporting ? (
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <svg className="w-[18px] h-[18px] sm:w-3.5 sm:h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               ) : (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                <svg className="w-[18px] h-[18px] sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
               )}
-              {pdfExporting ? "Generating…" : "Export PDF"}
+              <span className="hidden sm:inline">{pdfExporting ? "Generating…" : "Export PDF"}</span>
             </button>
           ) : (
             <button
               disabled
+              aria-label="Export PDF (workspace feature)"
               title="Workspace feature — create or join a workspace to export PDFs"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-600 border border-zinc-700 cursor-not-allowed opacity-60"
+              className="flex items-center justify-center sm:justify-start gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-xs font-medium bg-zinc-800 text-zinc-600 border border-zinc-700 cursor-not-allowed opacity-60"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-[18px] h-[18px] sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
-              Export PDF
+              <span className="hidden sm:inline">Export PDF</span>
             </button>
           )}
           <button
             onClick={() => setShowClearConfirm(true)}
             disabled={entries.length === 0}
-            className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Clear list"
+            title="Clear list"
+            className="flex items-center justify-center sm:justify-start gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-xs font-medium text-zinc-500 hover:text-red-400 bg-zinc-800 sm:bg-transparent border border-zinc-700 sm:border-transparent hover:bg-red-400/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Clear List
+            <svg className="w-[18px] h-[18px] sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+            <span className="hidden sm:inline">Clear List</span>
           </button>
         </div>
       </div>
 
       {/* Quick Fill bar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border)] bg-zinc-900/40 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 border-b border-[var(--border)] bg-zinc-900/40 shrink-0">
         <span className="text-xs text-zinc-500 shrink-0">My Team</span>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <input
             type="text"
             value={myTeamInput}
@@ -609,10 +622,10 @@ export default function PickListPage() {
             onFocus={() => setMyTeamOpen(true)}
             onBlur={() => setTimeout(() => setMyTeamOpen(false), 150)}
             placeholder="Team # or name…"
-            className="w-52 bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
+            className="w-full sm:w-52 bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
           />
           {myTeamOpen && myTeamSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-20 py-1 max-h-48 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 sm:right-auto mt-1 sm:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-20 py-1 max-h-48 overflow-y-auto">
               {myTeamSuggestions.map((t) => (
                 <button
                   key={t.teamNumber}
@@ -635,7 +648,7 @@ export default function PickListPage() {
         <button
           onClick={quickFill}
           disabled={allTeamData.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--accent)]/20"
+          className="w-full sm:w-auto flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2 sm:py-1.5 rounded-md text-xs font-medium bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--accent)]/20"
         >
           <svg
             className="w-3.5 h-3.5"
@@ -652,7 +665,7 @@ export default function PickListPage() {
           </svg>
           Quick Fill
         </button>
-        <span className="text-xs text-zinc-600">
+        <span className="hidden sm:inline text-xs text-zinc-600">
           {myTeamNumber
             ? isPrescout
               ? "Fills by season OPR"
@@ -721,7 +734,7 @@ export default function PickListPage() {
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+72px)] md:pb-0">
             {availableTeams.length === 0 ? (
               <div className="flex items-center justify-center h-16 text-xs text-zinc-600">
                 {availableSearch ? "No teams match" : "All teams added"}
@@ -784,7 +797,7 @@ export default function PickListPage() {
           </div>
 
           <div
-            className="flex-1 overflow-y-auto"
+            className="flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+72px)] md:pb-0"
             onDragOver={handleContainerDragOver}
             onDrop={handleContainerDrop}
           >
@@ -809,7 +822,8 @@ export default function PickListPage() {
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                <p className="text-xs text-zinc-600">Drag teams here or click to add</p>
+                <p className="text-xs text-zinc-600 hidden sm:block">Drag teams here or click to add</p>
+                <p className="text-xs text-zinc-600 sm:hidden">Tap + to add teams</p>
               </div>
             ) : (
               <div className="pb-8">
@@ -1042,8 +1056,8 @@ function PickListRow({
         <PenaltyBadge avg={penaltyAvg} threshold={penaltyThreshold} />
       </span>
 
-      {/* OPR */}
-      <span className="font-mono text-xs text-zinc-500 w-12 text-right shrink-0 tabular-nums">
+      {/* OPR — desktop only; mobile hides to keep row tight */}
+      <span className="hidden sm:block font-mono text-xs text-zinc-500 w-12 text-right shrink-0 tabular-nums">
         {entry.opr.toFixed(1)}
       </span>
 
