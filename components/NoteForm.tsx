@@ -1,19 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PREDEFINED_TAGS, tagColorClass } from "@/lib/notes";
 import { useNotes } from "@/context/NotesContext";
+import { useAuth } from "@/context/AuthContext";
+import { useEvent } from "@/context/EventContext";
+import { useWorkspaceOptional } from "@/context/WorkspaceContext";
+import { addWorkspaceNote } from "@/lib/workspace";
 
 interface NoteFormProps {
   teamNumber: number;
   onClose: () => void;
 }
 
+const SHARE_PREF_KEY = "plftc:noteForm:shareToWorkspace";
+
 export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
   const { addNote } = useNotes();
+  const { user } = useAuth();
+  const { eventCode } = useEvent();
+  const ws = useWorkspaceOptional();
   const [text, setText] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState("");
+  const [shareToWorkspace, setShareToWorkspace] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(SHARE_PREF_KEY);
+      if (v === "1") setShareToWorkspace(true);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHARE_PREF_KEY, shareToWorkspace ? "1" : "0");
+    } catch {}
+  }, [shareToWorkspace]);
 
   const toggleTag = (label: string) => {
     setSelectedTags((prev) =>
@@ -32,8 +54,20 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
   const handleSave = () => {
     if (!text.trim() && selectedTags.length === 0) return;
     addNote(teamNumber, text, selectedTags);
+    if (shareToWorkspace && ws?.workspace && user && eventCode) {
+      addWorkspaceNote(
+        ws.workspace.id,
+        user.id,
+        eventCode,
+        teamNumber,
+        text.trim(),
+        selectedTags
+      ).then(() => ws.refreshNotes());
+    }
     onClose();
   };
+
+  const canShareToWorkspace = !!ws?.workspace && !!user && !!eventCode;
 
   const customTags = selectedTags.filter(
     (t) => !PREDEFINED_TAGS.some((p) => p.label === t)
@@ -58,7 +92,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
         }}
         placeholder="Observation about this team…"
         rows={2}
-        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)] resize-none"
+        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all resize-none"
       />
 
       {/* Predefined tag chips */}
@@ -96,7 +130,7 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
             }
           }}
           placeholder="Custom tag (Enter to add)…"
-          className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:border-[var(--border-hover)]"
+          className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
         />
         <button
           type="button"
@@ -127,6 +161,22 @@ export function NoteForm({ teamNumber, onClose }: NoteFormProps) {
             </span>
           ))}
         </div>
+      )}
+
+      {/* Workspace share toggle */}
+      {canShareToWorkspace && (
+        <label className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={shareToWorkspace}
+            onChange={(e) => setShareToWorkspace(e.target.checked)}
+            className="accent-[var(--accent)]"
+          />
+          <span>
+            Share to workspace
+            <span className="text-[var(--foreground-dim)]"> · {ws!.workspace!.name}</span>
+          </span>
+        </label>
       )}
 
       {/* Action buttons */}

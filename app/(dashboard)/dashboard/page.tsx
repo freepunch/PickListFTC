@@ -7,11 +7,15 @@ import { EventLoader, focusEventInput } from "@/components/EventLoader";
 import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { StatCard } from "@/components/StatCard";
 import { ScoreDistribution } from "@/components/ScoreDistribution";
+import { ScoringTrendHeatmap } from "@/components/ScoringTrendHeatmap";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import { PrescoutRankedTeam } from "@/lib/types";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
 import { findScopedKeys } from "@/lib/storage";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useMatchNotifications } from "@/hooks/useMatchNotifications";
 
 function SkeletonCard() {
   return (
@@ -131,31 +135,32 @@ function PrescoutDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Prescout Leaderboard */}
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-200">
-              Prescout Rankings
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Prescout Rankings \u2014 seamless, no card chrome */}
+        <div className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display text-lg font-medium text-[var(--text-primary)] tracking-tight">
+              Rankings
             </h3>
             <Link
               href="/leaderboard"
-              className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+              className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
             >
-              View all
+              View all \u2192
             </Link>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-2 group/table">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800/50">
-                  <th className="text-left px-5 py-2.5 w-12">#</th>
-                  <th className="text-left py-2.5">Team</th>
-                  <th className="text-right px-3 py-2.5">Season Best OPR</th>
-                  <th className="text-right px-3 py-2.5">Season Avg</th>
-                  <th className="text-left px-3 py-2.5">W-L-T</th>
-                  <th className="text-center px-3 py-2.5">Events</th>
-                  <th className="text-center px-5 py-2.5">Trend</th>
+                <tr className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
+                  <th className="text-left px-3 py-2 w-12 font-medium">#</th>
+                  <th className="text-left py-2 font-medium">Team</th>
+                  <th className="text-right px-3 py-2 font-medium">Best OPR</th>
+                  <th className="text-right px-3 py-2 font-medium">Avg</th>
+                  <th className="text-left px-3 py-2 font-medium">Record</th>
+                  <th className="text-center px-3 py-2 font-medium">Events</th>
+                  <th className="text-center px-3 py-2 font-medium">Trend</th>
+                  <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
@@ -164,41 +169,43 @@ function PrescoutDashboard() {
                   return (
                     <tr
                       key={team.teamNumber}
-                      className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 transition-colors cursor-pointer"
+                      className="group/row border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-card-hover)] transition-colors"
                     >
-                      <td className="px-5 py-2.5 text-zinc-500 font-mono text-xs">
+                      <td className="px-3 py-3 text-[var(--text-muted)] font-mono text-xs">
                         {team.rank}
                       </td>
-                      <td className="py-2.5">
+                      <td className="py-3">
                         <Link href={`/report/${team.teamNumber}`} className="hover:underline">
-                          <span className="font-mono text-white text-xs mr-2">
+                          <span className="font-mono text-[var(--text-primary)] text-xs mr-2">
                             {team.teamNumber}
                           </span>
-                          <span className="text-zinc-400 hidden sm:inline">
+                          <span className="text-[var(--text-secondary)] hidden sm:inline">
                             {team.teamName}
                           </span>
                         </Link>
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-white text-xs">
+                      <td className="px-3 py-3 text-right font-mono text-[var(--text-primary)] text-xs tabular-nums">
                         {team.bestOpr.toFixed(1)}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-zinc-400 text-xs">
+                      <td className="px-3 py-3 text-right font-mono text-[var(--text-secondary)] text-xs tabular-nums">
                         {team.seasonAvg.toFixed(1)}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-zinc-400 text-xs">
+                      <td className="px-3 py-3 font-mono text-[var(--text-secondary)] text-xs">
                         {team.record.wins}-{team.record.losses}-{team.record.ties}
                       </td>
-                      <td className="px-3 py-2.5 text-center font-mono text-zinc-400 text-xs">
+                      <td className="px-3 py-3 text-center font-mono text-[var(--text-secondary)] text-xs">
                         {team.eventCount}
                       </td>
-                      <td className="px-5 py-2.5 text-center">
+                      <td className="px-3 py-3 text-center">
                         <span className={`text-sm ${trend.color}`}>{trend.icon}</span>
                       </td>
-                      <td className="px-3 py-2.5">
-                        <AddToPickListButton
-                          team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.bestOpr }}
-                          size="xs"
-                        />
+                      <td className="px-2 py-3">
+                        <span className="opacity-0 group-hover/row:opacity-100 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                          <AddToPickListButton
+                            team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.bestOpr }}
+                            size="xs"
+                          />
+                        </span>
                       </td>
                     </tr>
                   );
@@ -208,14 +215,12 @@ function PrescoutDashboard() {
           </div>
         </div>
 
-        {/* Teams to Watch */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-200">
-              Teams to Watch
-            </h3>
-          </div>
-          <div className="p-4 space-y-3">
+        {/* Teams to Watch \u2014 minimal list, no boxed cards */}
+        <div>
+          <h3 className="font-display text-lg font-medium text-[var(--text-primary)] tracking-tight mb-3">
+            Watch
+          </h3>
+          <div className="space-y-1">
             {teamsToWatch.map((team) => {
               const trend = TREND_ICON[team.trend];
               const isTop3 = team.rank <= 3;
@@ -223,29 +228,32 @@ function PrescoutDashboard() {
                 <Link
                   key={team.teamNumber}
                   href={`/report/${team.teamNumber}`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors"
+                  className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                    isTop3 ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
-                  }`}>
-                    {isTop3 ? `#${team.rank}` : trend.icon}
-                  </div>
+                  <span
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      isTop3
+                        ? "bg-[var(--accent-subtle)] text-[var(--accent)]"
+                        : `bg-transparent ${trend.color}`
+                    }`}
+                  >
+                    {isTop3 ? team.rank : trend.icon}
+                  </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-medium truncate">
-                      <span className="font-mono mr-1.5">{team.teamNumber}</span>
+                    <p className="text-sm text-[var(--text-primary)] font-medium truncate">
+                      <span className="font-mono mr-1.5 text-[var(--text-secondary)]">{team.teamNumber}</span>
                       {team.teamName}
                     </p>
-                    <p className="text-xs text-zinc-500">
-                      Best OPR {team.bestOpr.toFixed(1)} &middot; {team.eventCount} events
-                      {!isTop3 && " \u00b7 Trending up"}
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {team.bestOpr.toFixed(1)} OPR \u00b7 {team.eventCount} events
                     </p>
                   </div>
                 </Link>
               );
             })}
             {teamsToWatch.length === 0 && (
-              <p className="text-sm text-zinc-500 text-center py-4">
-                No prescout data available yet.
+              <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                No prescout data yet.
               </p>
             )}
           </div>
@@ -255,64 +263,82 @@ function PrescoutDashboard() {
   );
 }
 
-// ── Main Page ──
+// ── Live refresh bar ──
 
-function MyEventsSection() {
-  const { favoriteEvents, isEventFavorited, toggleEventFav } = useFavorites();
-  const { loadEvent, setEventCode } = useEvent();
+function LiveRefreshBar() {
+  const { isLive, isComplete, newMatchCount, lastUpdatedText, isRefreshing, refresh } =
+    useAutoRefresh();
+  const [toast, setToast] = useState<string | null>(null);
 
-  if (favoriteEvents.length === 0) return null;
+  useEffect(() => {
+    if (newMatchCount > 0) {
+      setToast(`${newMatchCount} new score${newMatchCount !== 1 ? "s" : ""} available`);
+      const t = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [newMatchCount]);
+
+  if (!isLive && !isComplete) return null;
 
   return (
-    <div className="mb-6">
-      <h3 className="text-sm font-semibold text-zinc-200 mb-3">My Events</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {favoriteEvents.map((fav) => (
+    <>
+      {toast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-5 py-3 shadow-2xl text-sm text-[var(--foreground)] flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+            {toast}
+          </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 bg-[var(--bg-card)] border-b border-[var(--border)] text-xs text-[var(--foreground-dim)]">
+        <div className="flex items-center gap-2">
+          {isLive && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+              <span className="text-green-400 font-medium">Live</span>
+            </span>
+          )}
+          {isComplete && (
+            <span className="text-zinc-500">Event complete · auto-refresh off</span>
+          )}
+          {lastUpdatedText && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span>Updated {lastUpdatedText}</span>
+            </>
+          )}
+        </div>
+        {isLive && (
           <button
-            key={fav.event_code}
-            onClick={() => {
-              setEventCode(fav.event_code);
-              loadEvent(fav.event_code);
-            }}
-            className="group relative bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-left
-              hover:border-zinc-700 hover:bg-zinc-800/50 transition-all"
+            onClick={refresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--bg-card-hover)] transition-colors disabled:opacity-40"
+            title="Refresh now"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">
-                  {fav.event_name || fav.event_code}
-                </p>
-                <p className="text-xs text-zinc-500 font-mono mt-1">
-                  {fav.event_code}
-                </p>
-                <p className="text-xs text-zinc-600 mt-0.5">
-                  Season {fav.season}
-                </p>
-              </div>
-              <span
-                role="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleEventFav(fav);
-                }}
-                className="p-1 shrink-0"
-              >
-                <svg
-                  className="w-4 h-4 text-amber-400 fill-amber-400"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                </svg>
-              </span>
-            </div>
+            <svg
+              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+            Refresh
           </button>
-        ))}
+        )}
       </div>
-    </div>
+    </>
   );
 }
+
+// ── Main Page ──
+
+// My Events card removed — sidebar duplicates this surface.
 
 // ── Season overview (shown when no event loaded but user has watched events) ──
 
@@ -570,7 +596,10 @@ function SeasonOverviewOrEmpty() {
 }
 
 export default function DashboardPage() {
-  const { event, teams, loading, isPrescout } = useEvent();
+  const { event, teams, loading, isPrescout, dataSource, prescoutRanking, prescoutLoading } = useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
+  const { profile } = useAuth();
+  useMatchNotifications();
 
   // "/" keyboard shortcut to focus event search
   useEffect(() => {
@@ -608,29 +637,26 @@ export default function DashboardPage() {
     };
   }, [playedMatches]);
 
-  const topOprTeam = useMemo(
-    () =>
-      teams.length > 0
-        ? teams.reduce((best, t) =>
-            t.stats.opr.totalPointsNp > best.stats.opr.totalPointsNp ? t : best
-          )
-        : null,
-    [teams]
-  );
+  const topOprTeam = useMemo(() => {
+    if (useSeasonData && prescoutRanking.length > 0) return prescoutRanking[0];
+    if (teams.length === 0) return null;
+    return teams.reduce((best, t) =>
+      t.stats.opr.totalPointsNp > best.stats.opr.totalPointsNp ? t : best
+    );
+  }, [teams, useSeasonData, prescoutRanking]);
 
-  const top10 = useMemo(
-    () => [...teams].sort((a, b) => a.stats.rank - b.stats.rank).slice(0, 10),
-    [teams]
-  );
+  const top10 = useMemo(() => {
+    if (useSeasonData && prescoutRanking.length > 0) return prescoutRanking.slice(0, 10);
+    return [...teams].sort((a, b) => a.stats.rank - b.stats.rank).slice(0, 10);
+  }, [teams, useSeasonData, prescoutRanking]);
 
   return (
     <div className="min-h-screen flex flex-col">
       <EventLoader />
       <PrescoutBanner />
+      <LiveRefreshBar />
 
-      <div className="flex-1 p-4 sm:p-6">
-        <MyEventsSection />
-
+      <div className="flex-1 p-4 sm:p-6 animate-page-fade-in max-w-[1200px] mx-auto w-full">
         {loading && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -672,8 +698,14 @@ export default function DashboardPage() {
                 subtitle="Per alliance"
               />
               <StatCard
-                label="Top OPR"
-                value={topOprTeam ? topOprTeam.stats.opr.totalPointsNp.toFixed(1) : "\u2014"}
+                label={useSeasonData ? "Top Season OPR" : "Top OPR"}
+                value={
+                  topOprTeam
+                    ? ("bestOpr" in topOprTeam
+                        ? (topOprTeam as import("@/lib/types").PrescoutRankedTeam).bestOpr.toFixed(1)
+                        : (topOprTeam as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp.toFixed(1))
+                    : "\u2014"
+                }
                 subtitle={
                   topOprTeam
                     ? `#${topOprTeam.teamNumber} ${topOprTeam.teamName}`
@@ -682,70 +714,128 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top 10 */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-                  <h3 className="text-sm font-semibold text-zinc-200">
-                    Top 10 Teams
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Top 10 — seamless, no card chrome */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display text-lg font-medium text-[var(--text-primary)] tracking-tight">
+                    {useSeasonData ? "Top 10 · season OPR" : "Top 10"}
                   </h3>
                   <Link
                     href="/leaderboard"
-                    className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+                    className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
                   >
-                    View all
+                    View all →
                   </Link>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto -mx-2">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800/50">
-                        <th className="text-left px-5 py-2.5 w-12">#</th>
-                        <th className="text-left py-2.5">Team</th>
-                        <th className="text-right px-5 py-2.5">OPR</th>
+                      <tr className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
+                        <th className="text-left px-3 py-2 w-12 font-medium">#</th>
+                        <th className="text-left py-2 font-medium">Team</th>
+                        <th className="text-right px-3 py-2 font-medium">OPR</th>
+                        <th className="w-10" />
                       </tr>
                     </thead>
                     <tbody>
-                      {top10.map((team, i) => (
-                        <tr
-                          key={team.teamNumber}
-                          className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/40 transition-colors cursor-pointer"
-                        >
-                          <td className="px-5 py-2.5 text-zinc-500 font-mono text-xs">
-                            {i + 1}
-                          </td>
-                          <td className="py-2.5">
-                            <span className="font-mono text-white text-xs mr-2">
-                              {team.teamNumber}
-                            </span>
-                            <span className="text-zinc-400 hidden sm:inline">
-                              {team.teamName}
-                            </span>
-                          </td>
-                          <td className="px-5 py-2.5 text-right font-mono text-white text-xs">
-                            {team.stats.opr.totalPointsNp.toFixed(1)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <AddToPickListButton
-                              team={{ teamNumber: team.teamNumber, teamName: team.teamName, opr: team.stats.opr.totalPointsNp }}
-                              size="xs"
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                      {top10.map((team, i) => {
+                        const isPsTeam = "bestOpr" in team;
+                        const opr = isPsTeam
+                          ? (team as import("@/lib/types").PrescoutRankedTeam).bestOpr.toFixed(1)
+                          : (team as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp.toFixed(1);
+                        return (
+                          <tr
+                            key={team.teamNumber}
+                            className="group/row border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-card-hover)] transition-colors"
+                          >
+                            <td className="px-3 py-3 text-[var(--text-muted)] font-mono text-xs">
+                              {i + 1}
+                            </td>
+                            <td className="py-3">
+                              <span className="font-mono text-[var(--text-primary)] text-xs mr-2">
+                                {team.teamNumber}
+                              </span>
+                              <span className="text-[var(--text-secondary)] hidden sm:inline">
+                                {team.teamName}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono text-[var(--text-primary)] text-xs tabular-nums">
+                              {opr}
+                            </td>
+                            <td className="px-2 py-3">
+                              <span className="opacity-0 group-hover/row:opacity-100 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                                <AddToPickListButton
+                                  team={{
+                                    teamNumber: team.teamNumber,
+                                    teamName: team.teamName,
+                                    opr: isPsTeam
+                                      ? (team as import("@/lib/types").PrescoutRankedTeam).bestOpr
+                                      : (team as import("@/lib/types").ProcessedTeam).stats.opr.totalPointsNp,
+                                  }}
+                                  size="xs"
+                                />
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
               {/* Score distribution */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-zinc-200 mb-4">
-                  Score Distribution
+              <div>
+                <h3 className="font-display text-lg font-medium text-[var(--text-primary)] tracking-tight mb-3">
+                  Score distribution
                 </h3>
-                <ScoreDistribution matches={event.matches} />
+                <div className="bg-[var(--bg-card)] rounded-xl p-5">
+                  <ScoreDistribution matches={event.matches} />
+                </div>
               </div>
             </div>
+
+            {/* Scoring Trends Heatmap */}
+            <WorkspaceGate
+              feature="Scoring Trends"
+              description="Create or join a workspace to unlock the Scoring Trend Heatmap, Draft Board, Alliance Simulator, and more."
+            >
+              <div>
+                <div className="flex items-end justify-between mb-3">
+                  <div>
+                    <h3 className="font-display text-lg font-medium text-[var(--text-primary)] tracking-tight">
+                      Scoring trends
+                    </h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      Team performance across all matches · sorted by OPR
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    {playedMatches.length} matches · {teams.length} teams
+                  </span>
+                </div>
+                <div className="bg-[var(--bg-card)] rounded-xl p-4">
+                  {playedMatches.length >= 3 ? (
+                    <ScoringTrendHeatmap
+                      matches={event.matches}
+                      teams={teams}
+                      eventCode={event.code}
+                      myTeam={profile?.team_number ?? null}
+                    />
+                  ) : (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Scoring trends will appear after more matches are played.
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        {playedMatches.length} of 3 needed
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </WorkspaceGate>
           </div>
         )}
       </div>

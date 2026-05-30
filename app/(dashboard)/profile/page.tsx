@@ -95,7 +95,7 @@ export default function ProfilePage() {
     : null;
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
+    <div className="min-h-screen p-4 sm:p-6 animate-page-fade-in">
       <div className="max-w-lg mx-auto space-y-6">
         {/* Toast */}
         {toast && (
@@ -161,8 +161,8 @@ export default function ProfilePage() {
                 placeholder="Your name"
                 maxLength={50}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white
-                  placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
-                  focus:ring-1 focus:ring-[var(--accent)]/30 transition-colors"
+                  placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                  focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               />
             </div>
 
@@ -182,8 +182,8 @@ export default function ProfilePage() {
                 placeholder="Enter your team #"
                 maxLength={5}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white font-mono
-                  placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]
-                  focus:ring-1 focus:ring-[var(--accent)]/30 transition-colors"
+                  placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                  focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
               />
               <p className="text-[11px] text-zinc-600 mt-1">
                 Used to match you with teammates for shared notes and pick lists.

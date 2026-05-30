@@ -89,7 +89,7 @@ export function TeamSearch({
       data-tutorial={dataTutorial}
       className={`relative ${className}`}
     >
-      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 focus-within:border-[var(--accent)]/40 transition-colors">
+      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 transition-all focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-0 focus-within:border-[var(--accent)]">
         {prefix}
         {showSearchIcon && (
           <svg

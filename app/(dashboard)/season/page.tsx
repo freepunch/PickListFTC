@@ -44,23 +44,23 @@ function SeasonPageInner() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 pb-12">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-6 pb-12 animate-page-fade-in">
+      <div className="max-w-[1200px] mx-auto">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">My Season</h1>
+            <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">My Season</h1>
             {profile?.team_number && (
-              <span className="text-sm font-mono text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 rounded-md">
+              <span className="text-sm font-mono text-[var(--accent)] bg-[var(--accent-subtle)] px-2 py-0.5 rounded-md">
                 #{profile.team_number}
               </span>
             )}
           </div>
-          <p className="text-sm text-zinc-500 mt-1">2025-2026 DECODE Season</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">2025-2026 DECODE Season</p>
         </div>
 
-        {/* Tab bar */}
-        <div className="mb-6 flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto scrollbar-hide w-fit max-w-full">
+        {/* Tab bar — underline style */}
+        <div className="mb-6 flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto scrollbar-hide">
           {TABS.map((t) => {
             const count =
               t.key === "events" ? favoriteEvents.length :
@@ -70,15 +70,15 @@ function SeasonPageInner() {
               <button
                 key={t.key}
                 onClick={() => selectTab(t.key)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                className={`px-3 py-2.5 -mb-px text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === t.key
-                    ? "bg-zinc-800 text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "border-[var(--accent)] text-[var(--text-primary)]"
+                    : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
                 {t.label}
                 {count !== null && count > 0 && (
-                  <span className={`ml-2 text-xs ${tab === t.key ? "text-zinc-400" : "text-zinc-600"}`}>
+                  <span className={`ml-2 text-xs ${tab === t.key ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
                     {count}
                   </span>
                 )}

@@ -5,6 +5,8 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
+  useRef,
   ReactNode,
 } from "react";
 import { Event, ProcessedTeam, TeamEventStats2025, PrescoutTeamData, PrescoutRankedTeam } from "@/lib/types";
@@ -24,6 +26,7 @@ interface EventState {
   prescoutRanking: PrescoutRankedTeam[];
   prescoutLoading: boolean;
   showLiveToast: boolean;
+  dataSource: 'season' | 'event';
 }
 
 interface EventContextValue extends EventState {
@@ -33,6 +36,8 @@ interface EventContextValue extends EventState {
   clearSelection: () => void;
   setEventCode: (code: string) => void;
   dismissLiveToast: () => void;
+  setDataSource: (s: 'season' | 'event') => void;
+  prescoutByTeam: Map<number, PrescoutRankedTeam>;
 }
 
 const EventContext = createContext<EventContextValue | null>(null);
@@ -102,7 +107,11 @@ export function EventProvider({ children }: { children: ReactNode }) {
     prescoutRanking: [],
     prescoutLoading: false,
     showLiveToast: false,
+    dataSource: 'event',
   });
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const loadEvent = useCallback(async (code: string) => {
     const upper = code.toUpperCase();
@@ -115,6 +124,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         ...prev, event: cached, teams, loading: false, error: null,
         eventCode: upper, selectedTeams: [], lastUpdated: eventCache.get(upper)!.timestamp,
         isPrescout: prescout, showLiveToast: false,
+        dataSource: prescout ? 'season' : 'event',
         ...(prescout ? {} : { prescoutData: [], prescoutRanking: [], prescoutLoading: false }),
       }));
       const age = Date.now() - eventCache.get(upper)!.timestamp;
@@ -136,6 +146,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         selectedTeams: [],
         lastUpdated: Date.now(),
         isPrescout: prescout,
+        dataSource: prescout ? 'season' : 'event',
         prescoutData: [],
         prescoutRanking: [],
         prescoutLoading: prescout,
@@ -181,6 +192,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         lastUpdated: Date.now(),
         isPrescout: prescout,
         showLiveToast: wasPrescout && !prescout,
+        ...(wasPrescout && !prescout ? { dataSource: 'event' } : {}),
         ...(!prescout ? { prescoutData: [], prescoutRanking: [], prescoutLoading: false } : {}),
         ...(prescout ? { prescoutLoading: true } : {}),
       }));
@@ -227,6 +239,34 @@ export function EventProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, showLiveToast: false }));
   }, []);
 
+  const setDataSource = useCallback(async (source: 'season' | 'event') => {
+    setState((prev) => ({ ...prev, dataSource: source }));
+
+    const s = stateRef.current;
+    if (
+      source === 'season' &&
+      !s.isPrescout &&
+      s.event !== null &&
+      s.prescoutData.length === 0 &&
+      !s.prescoutLoading
+    ) {
+      setState((prev) => ({ ...prev, prescoutLoading: true }));
+      try {
+        const teamNumbers = s.event!.teams.map((t) => t.teamNumber);
+        const prescoutData = await getPrescoutData(teamNumbers);
+        const prescoutRanking = getPrescoutRanking(prescoutData);
+        setState((prev) => ({ ...prev, prescoutData, prescoutRanking, prescoutLoading: false }));
+      } catch {
+        setState((prev) => ({ ...prev, prescoutLoading: false }));
+      }
+    }
+  }, []);
+
+  const prescoutByTeam = useMemo(
+    () => new Map(state.prescoutRanking.map((t) => [t.teamNumber, t])),
+    [state.prescoutRanking]
+  );
+
   return (
     <EventContext.Provider
       value={{
@@ -237,6 +277,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
         clearSelection,
         setEventCode,
         dismissLiveToast,
+        setDataSource,
+        prescoutByTeam,
       }}
     >
       {children}

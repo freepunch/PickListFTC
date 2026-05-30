@@ -135,7 +135,7 @@ export default function DonatePage() {
                   }}
                   placeholder="Enter amount"
                   autoFocus
-                  className="w-full pl-7 pr-3 py-3 bg-zinc-900 border border-[var(--accent)] rounded-xl text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
+                  className="w-full pl-7 pr-3 py-3 bg-zinc-900 border border-[var(--accent)] rounded-xl text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
               </div>
             ) : (

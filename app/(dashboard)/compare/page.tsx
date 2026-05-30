@@ -26,6 +26,7 @@ import {
 import { ProcessedTeam, Match, TeamEventStats2025, PrescoutRankedTeam } from "@/lib/types";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
 import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
+import { EmptyState } from "@/components/EmptyState";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const TEAM_COLORS = [
@@ -138,22 +139,24 @@ function TeamSlot({
   }
 
   return (
-    <TeamSearch
-      teams={searchOptions}
-      inputValue={query}
-      onInputChange={setQuery}
-      onSelect={(opt) => {
-        onSelect(opt.teamNumber);
-        setQuery("");
-      }}
-      placeholder="Search team # or name..."
-      prefix={
-        <div className={`w-2.5 h-2.5 rounded-full bg-zinc-700 shrink-0`} />
-      }
-      showSearchIcon={false}
-      showRank
-      enterToSelect
-    />
+    <div className="relative rounded-xl border-2 border-dashed border-[var(--border)] hover:border-[var(--border-hover)] transition-colors p-1.5 bg-transparent">
+      <TeamSearch
+        teams={searchOptions}
+        inputValue={query}
+        onInputChange={setQuery}
+        onSelect={(opt) => {
+          onSelect(opt.teamNumber);
+          setQuery("");
+        }}
+        placeholder="Search team…"
+        prefix={
+          <div className={`w-2.5 h-2.5 rounded-full bg-[var(--border)] shrink-0`} />
+        }
+        showSearchIcon={false}
+        showRank
+        enterToSelect
+      />
+    </div>
   );
 }
 
@@ -313,6 +316,11 @@ const STAT_GROUPS: { title: string; stats: StatBarDef[] }[] = [
         accessor: (s) => s.dev.totalPointsNp,
         format: (v) => `${v.toFixed(1)} dev`,
       },
+      {
+        label: "Penalties Avg",
+        accessor: (s) => s.avg.penaltyPointsCommitted ?? 0,
+        format: (v) => `${v.toFixed(1)} pts`,
+      },
     ],
   },
 ];
@@ -353,16 +361,19 @@ function StatComparisonBar({
 }) {
   const values = teams.map((t) => stat.accessor(t.stats));
   const maxVal = Math.max(...values, 0.01);
-  const isConsistency = stat.label === "Consistency";
+  const isLowerBetter = stat.label === "Consistency" || stat.label === "Penalties Avg";
 
   return (
     <div className="py-2">
-      <p className="text-xs text-zinc-500 mb-1.5">{stat.label}</p>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-zinc-500">{stat.label}</p>
+        {isLowerBetter && <span className="text-[10px] text-zinc-600">(lower = better)</span>}
+      </div>
       <div className="space-y-1">
         {teams.map((team, i) => {
           const val = values[i];
           const pct = (val / maxVal) * 100;
-          const isBest = isConsistency
+          const isBest = isLowerBetter
             ? val === Math.min(...values)
             : val === Math.max(...values);
           const color = TEAM_COLORS[i];
@@ -640,16 +651,16 @@ export default function ComparePage() {
   const compGrade = compScore !== null ? getComplementarityGrade(compScore) : null;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <EventLoader />
       <PrescoutBanner />
 
-      <div className="flex-1 p-4 sm:p-6">
+      <div className="flex-1 p-4 sm:p-6 max-w-[1200px] mx-auto w-full">
         {loading && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {[0, 1].map((i) => (
-                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 space-y-2">
+                <div key={i} className="bg-[var(--bg-card)] rounded-xl px-4 py-3 space-y-2">
                   <div className="skeleton h-4 w-16" />
                   <div className="skeleton h-3 w-32" />
                   <div className="skeleton h-3 w-24" />
@@ -664,18 +675,10 @@ export default function ComparePage() {
         )}
 
         {!event && !loading && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-zinc-200 mb-2">Compare Teams</h2>
-            <p className="text-sm text-zinc-500">Load an event, then select teams to compare</p>
-            <p className="text-xs text-zinc-600 mt-3">
-              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">Esc</kbd> to clear selections
-            </p>
-          </div>
+          <EmptyState
+            title="Compare teams side by side"
+            description="Load an event, then pick at least two teams to see complementarity and stat-by-stat differences."
+          />
         )}
 
         {event && !loading && (

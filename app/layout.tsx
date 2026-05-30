@@ -5,6 +5,7 @@ import { NotesProvider } from "@/context/NotesContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { FavoritesProvider } from "@/context/FavoritesContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -60,11 +61,13 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <ThemeProvider>
-            <FavoritesProvider>
-              <EventProvider>
-                <NotesProvider>{children}</NotesProvider>
-              </EventProvider>
-            </FavoritesProvider>
+            <WorkspaceProvider>
+              <FavoritesProvider>
+                <EventProvider>
+                  <NotesProvider>{children}</NotesProvider>
+                </EventProvider>
+              </FavoritesProvider>
+            </WorkspaceProvider>
           </ThemeProvider>
         </AuthProvider>
         <Analytics />

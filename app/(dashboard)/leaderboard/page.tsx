@@ -16,16 +16,18 @@ import { getWLT } from "@/lib/calculations";
 import { ProcessedTeam, Match, Alliance, PrescoutRankedTeam, TeamEventEntry, TeamEventStats2025 } from "@/lib/types";
 import { penaltyP75 } from "@/lib/calculations";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
+import { WorkspaceGate } from "@/components/WorkspaceGate";
 import { NotesBadge } from "@/components/NotesBadge";
 import { NoteForm } from "@/components/NoteForm";
 import { useNotes } from "@/context/NotesContext";
 import { tagColorClass } from "@/lib/notes";
 import { useFavorites } from "@/context/FavoritesContext";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── Tab / Column definitions (live mode) ──
 
-type TabId = "overview" | "auto" | "dc" | "advanced";
+type TabId = "overview" | "auto" | "dc" | "advanced" | "penalties";
 
 interface ColDef {
   key: string;
@@ -265,9 +267,14 @@ const TABS: { id: TabId; label: string; columns: ColDef[] }[] = [
       },
     ],
   },
+  {
+    id: "penalties",
+    label: "Penalties",
+    columns: [],
+  },
 ];
 
-const TAB_ORDER: TabId[] = ["overview", "auto", "dc", "advanced"];
+const TAB_ORDER: TabId[] = ["overview", "auto", "dc", "advanced", "penalties"];
 
 // ── Prescout Tab / Column definitions ──
 
@@ -509,8 +516,9 @@ function PrescoutExpandedDetail({ team }: { team: PrescoutRankedTeam }) {
 // ── Main page ──
 
 export default function LeaderboardPage() {
-  const { teams, event, loading, selectedTeams, toggleTeamSelection, isPrescout, prescoutRanking, prescoutLoading } =
+  const { teams, event, loading, selectedTeams, toggleTeamSelection, isPrescout, prescoutRanking, prescoutLoading, dataSource } =
     useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [sortKey, setSortKey] = useState<string>("rank");
   const [sortAsc, setSortAsc] = useState(true);
@@ -526,7 +534,8 @@ export default function LeaderboardPage() {
   const currentTab = TABS.find((t) => t.id === activeTab)!;
   const columns = currentTab.columns;
 
-  const currentPsTab = PRESCOUT_TABS.find((t) => t.id === activeTab)!;
+  // PRESCOUT_TABS has no "penalties" entry — fall back to overview so psColumns is never undefined
+  const currentPsTab = PRESCOUT_TABS.find((t) => t.id === activeTab) ?? PRESCOUT_TABS[0];
   const psColumns = currentPsTab.columns;
 
   // Debounce search input
@@ -542,7 +551,7 @@ export default function LeaderboardPage() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
-      if (e.key >= "1" && e.key <= "4" && !e.ctrlKey && !e.metaKey) {
+      if (e.key >= "1" && e.key <= "5" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const idx = parseInt(e.key) - 1;
         if (idx < TAB_ORDER.length) handleTabChange(TAB_ORDER[idx]);
@@ -629,50 +638,42 @@ export default function LeaderboardPage() {
   const isNumericCol = (key: string) =>
     key !== "name" && key !== "wlt" && key !== "trend";
 
-  const tabDefs = isPrescout ? PRESCOUT_TABS : TABS;
-  const displayData = isPrescout ? psSorted : sorted;
-  const displayColumns = isPrescout ? psColumns : columns;
+  const tabDefs = useSeasonData ? PRESCOUT_TABS : TABS;
+  const displayData = useSeasonData ? psSorted : sorted;
+  const displayColumns = useSeasonData ? psColumns : columns;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <EventLoader />
       <PrescoutBanner />
 
-      <div className="flex-1 p-4 sm:p-6 pb-24">
-        {(loading || (isPrescout && prescoutLoading)) && <SkeletonTable />}
+      <div className="flex-1 p-4 sm:p-6 pb-24 max-w-[1200px] mx-auto w-full">
+        {(loading || (useSeasonData && prescoutLoading)) && <SkeletonTable />}
 
         {!event && !loading && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-zinc-200 mb-2">Leaderboard</h2>
-            <p className="text-sm text-zinc-500">Load an event to see team rankings</p>
-            <p className="hidden md:block text-xs text-zinc-600 mt-3">
-              Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">1</kbd>-<kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">4</kbd> to switch tabs
-            </p>
-          </div>
+          <EmptyState
+            title="Ranked team performance, at a glance"
+            description="Load an event to see live OPR, scoring, and ranking tables. Press 1–5 to switch tabs once it's loaded."
+          />
         )}
 
-        {event && !loading && !(isPrescout && prescoutLoading) && (
+        {event && !loading && !(useSeasonData && prescoutLoading) && (
           <div className="space-y-4">
-            {/* Tab bar */}
-            <div data-tutorial="stat-tabs" className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto scrollbar-hide">
+            {/* Tab bar — minimal underline style */}
+            <div data-tutorial="stat-tabs" className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto scrollbar-hide">
               {tabDefs.map((tab, i) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 whitespace-nowrap ${
+                  className={`relative px-3 py-2.5 -mb-px text-sm font-medium transition-colors duration-150 whitespace-nowrap border-b-2 ${
                     activeTab === tab.id
-                      ? "bg-zinc-800 text-white shadow-sm"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      ? "border-[var(--accent)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   }`}
                 >
                   <span className="hidden sm:inline">{tab.label}</span>
                   <span className="sm:hidden">{tab.label.split("-")[0]}</span>
-                  <span className="ml-1.5 text-xs text-zinc-600 hidden lg:inline">{i + 1}</span>
+                  <span className="ml-1.5 text-xs text-[var(--text-muted)] hidden lg:inline">{i + 1}</span>
                 </button>
               ))}
             </div>
@@ -696,8 +697,8 @@ export default function LeaderboardPage() {
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Filter by team # or name..."
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white
-                    placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700
-                    focus:ring-1 focus:ring-zinc-700/50 transition-colors"
+                    placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                    focus:ring-offset-0 focus:border-[var(--accent)] transition-all"
                 />
                 {search && (
                   <button
@@ -733,19 +734,39 @@ export default function LeaderboardPage() {
             <p className="text-xs text-zinc-600">
               {displayData.length} team{displayData.length !== 1 ? "s" : ""}
               {search && ` matching "${search}"`}
-              {isPrescout && " \u00b7 Season data"}
+              {useSeasonData ? " \u00b7 Season data" : " \u00b7 Event day data"}
             </p>
+            {!useSeasonData && !isPrescout && teams.some((t) => t.stats.qualMatchesPlayed > 0 && t.stats.qualMatchesPlayed < 3) && (
+              <p className="text-[10px] text-amber-400/70 flex items-center gap-1">
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                Some teams have fewer than 3 matches — stats may not be reliable yet
+              </p>
+            )}
+
+            {/* Penalties tab — custom component, workspace-gated */}
+            {activeTab === "penalties" && !useSeasonData && (
+              <WorkspaceGate feature="Penalty Analytics" description="Create or join a workspace to access Penalty Analytics, Alliance Simulator, Draft Board, and more.">
+                <PenaltyLeaderboard
+                  teams={sorted}
+                  matches={event.matches}
+                  penaltyThreshold={penaltyThreshold}
+                />
+              </WorkspaceGate>
+            )}
 
             {/* Table */}
+            {!(activeTab === "penalties" && !useSeasonData) && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-800">
-                      {!isPrescout && <th className="w-20 px-2 sm:px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
+                      {!useSeasonData && <th className="w-20 px-2 sm:px-3 py-3 sticky left-0 bg-zinc-900 z-20" />}
                       {displayColumns.map((col) => {
                         const isSorted = sortKey === col.key;
-                        const isSticky = col.key === "teamNumber" && !isPrescout;
+                        const isSticky = col.key === "teamNumber" && !useSeasonData;
                         const hideCls = col.hideOnMobile ? "hidden sm:table-cell" : "";
                         return (
                           <th
@@ -782,7 +803,7 @@ export default function LeaderboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {isPrescout ? (
+                    {useSeasonData ? (
                       // Prescout rows
                       (psSorted as PrescoutRankedTeam[]).map((team, i) => {
                         const isExpanded = expandedTeam === team.teamNumber;
@@ -1025,6 +1046,7 @@ export default function LeaderboardPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
       </div>
@@ -1097,6 +1119,186 @@ function InlineNotesSection({ teamNumber }: { teamNumber: number }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Penalty Leaderboard (custom table for Penalties tab) ──
+
+type PenaltySortKey = "avg" | "majors" | "minors" | "rate" | "impact";
+
+interface PenaltyRow {
+  team: ProcessedTeam;
+  avg: number;
+  majors: number;
+  minors: number;
+  rate: number;
+  impact: number;
+}
+
+function penaltyRiskLabel(avg: number): { label: string; color: string; bg: string } {
+  if (avg < 5) return { label: "Low", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" };
+  if (avg <= 15) return { label: "Moderate", color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20" };
+  return { label: "High", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" };
+}
+
+function PenaltyLeaderboard({
+  teams,
+  matches,
+  penaltyThreshold,
+}: {
+  teams: ProcessedTeam[];
+  matches: Match[];
+  penaltyThreshold: number;
+}) {
+  const [penaltySortKey, setPenaltySortKey] = useState<PenaltySortKey>("avg");
+  const [penaltySortAsc, setPenaltySortAsc] = useState(true);
+
+  const penaltyRateMap = useMemo(() => {
+    const map = new Map<number, { played: number; withPenalty: number }>();
+    for (const m of matches) {
+      if (!m.hasBeenPlayed || !m.scores) continue;
+      for (const mt of m.teams) {
+        const alliance = mt.alliance.toLowerCase() as "red" | "blue";
+        const score = m.scores[alliance];
+        if (!score) continue;
+        const cur = map.get(mt.teamNumber) ?? { played: 0, withPenalty: 0 };
+        cur.played++;
+        if ((score.penaltyPointsCommitted ?? 0) > 0) cur.withPenalty++;
+        map.set(mt.teamNumber, cur);
+      }
+    }
+    const rateMap = new Map<number, number>();
+    for (const [num, { played, withPenalty }] of map) {
+      rateMap.set(num, played > 0 ? (withPenalty / played) * 100 : 0);
+    }
+    return rateMap;
+  }, [matches]);
+
+  const rows = useMemo<PenaltyRow[]>(() => {
+    return teams.map((t) => ({
+      team: t,
+      avg: t.stats.avg.penaltyPointsCommitted ?? 0,
+      majors: t.stats.avg.majorsCommittedPoints ?? 0,
+      minors: t.stats.avg.minorsCommittedPoints ?? 0,
+      rate: penaltyRateMap.get(t.teamNumber) ?? 0,
+      impact: t.stats.opr.totalPointsNp > 0
+        ? ((t.stats.avg.penaltyPointsCommitted ?? 0) / t.stats.opr.totalPointsNp) * 100
+        : 0,
+    }));
+  }, [teams, penaltyRateMap]);
+
+  const rankMap = useMemo(() => {
+    const byAvg = [...rows].sort((a, b) => a.avg - b.avg);
+    const m = new Map<number, number>();
+    byAvg.forEach((r, i) => m.set(r.team.teamNumber, i + 1));
+    return m;
+  }, [rows]);
+
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const av = a[penaltySortKey];
+      const bv = b[penaltySortKey];
+      return penaltySortAsc ? av - bv : bv - av;
+    });
+  }, [rows, penaltySortKey, penaltySortAsc]);
+
+  const handleSort = (key: PenaltySortKey) => {
+    if (penaltySortKey === key) {
+      setPenaltySortAsc(!penaltySortAsc);
+    } else {
+      setPenaltySortKey(key);
+      setPenaltySortAsc(true);
+    }
+  };
+
+  const SortHeader = ({ label, col, hideOnMobile }: { label: string; col: PenaltySortKey; hideOnMobile?: boolean }) => {
+    const isSorted = penaltySortKey === col;
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        className={`px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors whitespace-nowrap text-right ${
+          isSorted ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-zinc-500 hover:text-zinc-300"
+        } ${hideOnMobile ? "hidden sm:table-cell" : ""}`}
+      >
+        <span className="inline-flex items-center gap-1 justify-end">
+          {label}
+          {isSorted && (
+            <svg className={`w-3 h-3 transition-transform ${penaltySortAsc ? "" : "rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+            </svg>
+          )}
+        </span>
+      </th>
+    );
+  };
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-800">
+              <th className="w-12 px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-left text-zinc-500">Rank</th>
+              <th className="px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-left text-zinc-500">Team</th>
+              <SortHeader label="Avg / Match" col="avg" />
+              <SortHeader label="Avg Majors" col="majors" hideOnMobile />
+              <SortHeader label="Avg Minors" col="minors" hideOnMobile />
+              <SortHeader label="Penalty Rate" col="rate" />
+              <SortHeader label="OPR Impact" col="impact" hideOnMobile />
+              <th className="px-2 sm:px-3 py-3 text-xs font-medium uppercase tracking-wider text-right text-zinc-500">Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row, i) => {
+              const risk = penaltyRiskLabel(row.avg);
+              const rank = rankMap.get(row.team.teamNumber) ?? i + 1;
+              return (
+                <tr
+                  key={row.team.teamNumber}
+                  className={`border-b border-zinc-800/50 ${
+                    i % 2 === 0 ? "bg-zinc-900" : "bg-zinc-900/60"
+                  } hover:bg-zinc-800/70 transition-colors`}
+                >
+                  <td className="px-2 sm:px-3 py-2.5 font-mono text-zinc-500">#{rank}</td>
+                  <td className="px-2 sm:px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/report/${row.team.teamNumber}`} className="font-mono text-white font-medium hover:underline shrink-0">
+                        {row.team.teamNumber}
+                      </Link>
+                      <span className="text-zinc-400 truncate max-w-[160px]">{row.team.teamName}</span>
+                      <PenaltyBadge avg={row.avg} threshold={penaltyThreshold} />
+                    </div>
+                  </td>
+                  <td className={`px-2 sm:px-3 py-2.5 text-right font-mono font-medium ${penaltyColor(row.avg)}`}>
+                    {row.avg.toFixed(1)}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-400">
+                    {row.majors > 0 ? row.majors.toFixed(1) : "—"}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-400">
+                    {row.minors > 0 ? row.minors.toFixed(1) : "—"}
+                  </td>
+                  <td className="px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-300">
+                    {row.rate > 0 ? `${row.rate.toFixed(0)}%` : "—"}
+                  </td>
+                  <td className="hidden sm:table-cell px-2 sm:px-3 py-2.5 text-right font-mono text-zinc-500">
+                    {row.impact > 0 ? `${row.impact.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-2 sm:px-3 py-2.5 text-right">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${risk.bg} ${risk.color}`}>
+                      {risk.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {sorted.length === 0 && (
+        <div className="py-12 text-center text-zinc-500 text-sm">No team data available</div>
       )}
     </div>
   );

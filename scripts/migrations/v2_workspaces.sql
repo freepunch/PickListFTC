@@ -1,0 +1,415 @@
+-- V2: Paid collaborative workspaces.
+-- Run this in the Supabase SQL editor.
+
+CREATE TABLE IF NOT EXISTS workspaces (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  team_number INT,
+  invite_code TEXT UNIQUE NOT NULL,
+  invite_disabled BOOLEAN DEFAULT false,
+  owner_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  season INT NOT NULL DEFAULT 2025,
+  stripe_session_id TEXT,
+  paid BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'viewer', -- 'admin', 'editor', 'viewer'
+  joined_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS workspace_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  team_number INT NOT NULL,
+  text TEXT NOT NULL,
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workspace_pick_lists (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  list_data JSONB NOT NULL,
+  last_edited_by UUID REFERENCES profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code)
+);
+
+CREATE TABLE IF NOT EXISTS workspace_suggestions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  pick_list_id UUID REFERENCES workspace_pick_lists(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  suggestion_type TEXT NOT NULL, -- 'add', 'remove', 'move'
+  team_number INT NOT NULL,
+  target_position INT,
+  reason TEXT,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workspace_activity (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL,
+  payload JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS workspace_notes_ws_event_idx
+  ON workspace_notes (workspace_id, event_code);
+CREATE INDEX IF NOT EXISTS workspace_pick_lists_ws_idx
+  ON workspace_pick_lists (workspace_id);
+CREATE INDEX IF NOT EXISTS workspace_suggestions_ws_status_idx
+  ON workspace_suggestions (workspace_id, status);
+CREATE INDEX IF NOT EXISTS workspace_activity_ws_created_idx
+  ON workspace_activity (workspace_id, created_at DESC);
+
+-- ── RLS ──────────────────────────────────────────────────────────────────
+ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_pick_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_suggestions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_activity ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read workspace" ON workspaces;
+CREATE POLICY "Members read workspace" ON workspaces FOR SELECT
+  USING (id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Admin manages workspace" ON workspaces;
+CREATE POLICY "Admin manages workspace" ON workspaces FOR ALL
+  USING (owner_id = auth.uid());
+
+DROP POLICY IF EXISTS "Members read members" ON workspace_members;
+CREATE POLICY "Members read members" ON workspace_members FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Admin manages members" ON workspace_members;
+CREATE POLICY "Admin manages members" ON workspace_members FOR ALL
+  USING (workspace_id IN (SELECT id FROM workspaces WHERE owner_id = auth.uid()));
+DROP POLICY IF EXISTS "Members leave" ON workspace_members;
+CREATE POLICY "Members leave" ON workspace_members FOR DELETE
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Members read notes" ON workspace_notes;
+CREATE POLICY "Members read notes" ON workspace_notes FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Members write notes" ON workspace_notes;
+CREATE POLICY "Members write notes" ON workspace_notes FOR INSERT
+  WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND author_id = auth.uid()
+  );
+DROP POLICY IF EXISTS "Authors edit notes" ON workspace_notes;
+CREATE POLICY "Authors edit notes" ON workspace_notes FOR UPDATE USING (author_id = auth.uid());
+DROP POLICY IF EXISTS "Authors delete notes" ON workspace_notes;
+CREATE POLICY "Authors delete notes" ON workspace_notes FOR DELETE
+  USING (
+    author_id = auth.uid()
+    OR workspace_id IN (SELECT id FROM workspaces WHERE owner_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Members read pick lists" ON workspace_pick_lists;
+CREATE POLICY "Members read pick lists" ON workspace_pick_lists FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Editors write pick lists" ON workspace_pick_lists;
+CREATE POLICY "Editors write pick lists" ON workspace_pick_lists FOR ALL
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Members read suggestions" ON workspace_suggestions;
+CREATE POLICY "Members read suggestions" ON workspace_suggestions FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Members write suggestions" ON workspace_suggestions;
+CREATE POLICY "Members write suggestions" ON workspace_suggestions FOR INSERT
+  WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND author_id = auth.uid()
+  );
+DROP POLICY IF EXISTS "Admin manages suggestions" ON workspace_suggestions;
+CREATE POLICY "Admin manages suggestions" ON workspace_suggestions FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Members read activity" ON workspace_activity;
+CREATE POLICY "Members read activity" ON workspace_activity FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Members write activity" ON workspace_activity;
+CREATE POLICY "Members write activity" ON workspace_activity FOR INSERT
+  WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND actor_id = auth.uid()
+  );
+
+-- Public read for invite-code lookups on the /join/[code] page.
+CREATE OR REPLACE FUNCTION public.lookup_workspace_by_invite(invite_code_input TEXT)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  team_number INT,
+  season INT,
+  invite_disabled BOOLEAN,
+  member_count BIGINT
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    w.id,
+    w.name,
+    w.team_number,
+    w.season,
+    w.invite_disabled,
+    (SELECT count(*) FROM workspace_members m WHERE m.workspace_id = w.id) AS member_count
+  FROM workspaces w
+  WHERE w.invite_code = upper(invite_code_input) AND w.paid = true
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.lookup_workspace_by_invite(TEXT) TO anon, authenticated;
+
+-- ── Personal rankings (Consensus Builder) ────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_personal_rankings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  rankings JSONB NOT NULL DEFAULT '[]', -- ordered array of teamNumbers
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_personal_rankings_ws_event_idx
+  ON workspace_personal_rankings (workspace_id, event_code);
+
+ALTER TABLE workspace_personal_rankings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read personal rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members read personal rankings" ON workspace_personal_rankings FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Members insert own rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members insert own rankings" ON workspace_personal_rankings FOR INSERT
+  WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND user_id = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Members update own rankings" ON workspace_personal_rankings;
+CREATE POLICY "Members update own rankings" ON workspace_personal_rankings FOR UPDATE
+  USING (user_id = auth.uid());
+
+-- ── Scouting assignments ──────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_scouting_assignments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  team_number INT NOT NULL,
+  assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'unscouted', -- 'unscouted', 'assigned', 'in_progress', 'scouted'
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code, team_number)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_scouting_ws_event_idx
+  ON workspace_scouting_assignments (workspace_id, event_code);
+
+ALTER TABLE workspace_scouting_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members read assignments" ON workspace_scouting_assignments FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Members insert assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members insert assignments" ON workspace_scouting_assignments FOR INSERT
+  WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors update assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Editors update assignments" ON workspace_scouting_assignments FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Members update own assignments" ON workspace_scouting_assignments;
+CREATE POLICY "Members update own assignments" ON workspace_scouting_assignments FOR UPDATE
+  USING (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND (assigned_to = auth.uid() OR assigned_to IS NULL)
+  );
+
+-- ── Draft board ───────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_drafts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  num_alliances INT NOT NULL DEFAULT 4,
+  ranking_order JSONB NOT NULL DEFAULT '[]',
+  picks JSONB NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'setup', -- 'setup', 'active', 'complete'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_drafts_ws_event_idx
+  ON workspace_drafts (workspace_id, event_code);
+
+ALTER TABLE workspace_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read drafts" ON workspace_drafts;
+CREATE POLICY "Members read drafts" ON workspace_drafts FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors write drafts" ON workspace_drafts;
+CREATE POLICY "Editors write drafts" ON workspace_drafts FOR ALL
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+-- ── Match assignments ─────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_match_assignments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  event_code TEXT NOT NULL,
+  match_id TEXT NOT NULL,
+  assigned_to UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'assigned', -- 'assigned', 'completed'
+  report TEXT,
+  confidence TEXT, -- 'high', 'medium', 'low'
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code, match_id, assigned_to)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_match_assignments_ws_event_idx
+  ON workspace_match_assignments (workspace_id, event_code);
+
+ALTER TABLE workspace_match_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read match assignments" ON workspace_match_assignments;
+CREATE POLICY "Members read match assignments" ON workspace_match_assignments FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors insert match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors insert match assignments" ON workspace_match_assignments FOR INSERT
+  WITH CHECK (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Editors update match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors update match assignments" ON workspace_match_assignments FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Assigned member submit report" ON workspace_match_assignments;
+CREATE POLICY "Assigned member submit report" ON workspace_match_assignments FOR UPDATE
+  USING (
+    workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())
+    AND assigned_to = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Editors delete match assignments" ON workspace_match_assignments;
+CREATE POLICY "Editors delete match assignments" ON workspace_match_assignments FOR DELETE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+-- ── Workspace events (season calendar) ────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS workspace_events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE NOT NULL,
+  event_code TEXT NOT NULL,
+  event_name TEXT,
+  event_start DATE,
+  event_location TEXT,
+  added_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(workspace_id, event_code)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_events_ws_idx
+  ON workspace_events (workspace_id, event_start);
+
+ALTER TABLE workspace_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Members read events" ON workspace_events;
+CREATE POLICY "Members read events" ON workspace_events FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Editors insert events" ON workspace_events;
+CREATE POLICY "Editors insert events" ON workspace_events FOR INSERT
+  WITH CHECK (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Editors update events" ON workspace_events;
+CREATE POLICY "Editors update events" ON workspace_events FOR UPDATE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role IN ('admin', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Admin deletes events" ON workspace_events;
+CREATE POLICY "Admin deletes events" ON workspace_events FOR DELETE
+  USING (
+    workspace_id IN (
+      SELECT workspace_id FROM workspace_members
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- Realtime: enable so all members see new events instantly (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'workspace_events'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE workspace_events;
+  END IF;
+END $$;

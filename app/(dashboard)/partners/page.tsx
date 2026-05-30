@@ -27,6 +27,7 @@ import { PrescoutBanner } from "@/components/PrescoutBanner";
 import { PenaltyBadge } from "@/components/PenaltyBadge";
 import { AddToPickListButton } from "@/components/AddToPickListButton";
 import { TeamSearch, TeamSearchOption } from "@/components/TeamSearch";
+import { EmptyState } from "@/components/EmptyState";
 import { copyToClipboard } from "@/lib/clipboard";
 
 // ── Radar axes (same as compare view) ──
@@ -402,6 +403,7 @@ function PartnerRow({
   selected,
   allTeams,
   penaltyThreshold,
+  mode,
   expanded,
   onToggle,
 }: {
@@ -410,12 +412,22 @@ function PartnerRow({
   selected: ProcessedTeam;
   allTeams: ProcessedTeam[];
   penaltyThreshold: number;
+  mode: string;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const router = useRouter();
   const partner = allTeams.find((t) => t.teamNumber === result.teamNumber)!;
   const partnerPenaltyAvg = partner?.stats.avg.penaltyPointsCommitted ?? 0;
+  const penaltyAdjusted =
+    mode === "balanced" &&
+    penaltyThreshold !== Infinity &&
+    partnerPenaltyAvg > penaltyThreshold;
+  const penaltyDeduction = penaltyAdjusted
+    ? Math.round(
+        Math.min((partnerPenaltyAvg - penaltyThreshold) / (penaltyThreshold || 1), 1) * 5
+      )
+    : 0;
 
   return (
     <div className="border-b border-zinc-800 last:border-b-0" style={{ transition: "transform 0.3s ease, opacity 0.3s ease" }}>
@@ -432,11 +444,18 @@ function PartnerRow({
           <span className="text-sm text-zinc-400 truncate">{result.teamName}</span>
           <PenaltyBadge avg={partnerPenaltyAvg} threshold={penaltyThreshold} />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${scoreBarColor(result.score)}`} style={{ width: `${result.score}%` }} />
+        <div className="flex flex-col justify-center">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${scoreBarColor(result.score)}`} style={{ width: `${result.score}%` }} />
+            </div>
+            <span className="font-mono text-sm font-semibold text-white w-8 text-right">{result.score}</span>
           </div>
-          <span className="font-mono text-sm font-semibold text-white w-8 text-right">{result.score}</span>
+          {penaltyAdjusted && penaltyDeduction > 0 && (
+            <p className="text-[10px] text-amber-400/70 mt-0.5">
+              Score adjusted for penalty risk (-{penaltyDeduction})
+            </p>
+          )}
         </div>
         <span className="font-mono text-sm text-zinc-300 text-center">{result.projectedCombinedOpr.toFixed(1)}</span>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap w-fit ${tagColor(result.complementarityTag)}`}>
@@ -700,7 +719,8 @@ function PartnersSkeleton() {
 }
 
 export default function PartnersPage() {
-  const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading } = useEvent();
+  const { event, teams, loading, isPrescout, prescoutRanking, prescoutLoading, dataSource } = useEvent();
+  const useSeasonData = isPrescout || dataSource === 'season';
   const [selectedTeam, setSelectedTeam] = useState<ProcessedTeam | null>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [mode, setMode] = useState<PartnerMode>("balanced");
@@ -713,16 +733,16 @@ export default function PartnersPage() {
   );
 
   const ranked = useMemo(() => {
-    if (!selectedTeam || isPrescout) return [];
+    if (!selectedTeam || useSeasonData) return [];
     return rankPartners(selectedTeam, teams, mode);
-  }, [selectedTeam, teams, mode, isPrescout]);
+  }, [selectedTeam, teams, mode, useSeasonData]);
 
   const prescoutRanked = useMemo(() => {
-    if (!selectedPrescout || !isPrescout) return [];
+    if (!selectedPrescout || !useSeasonData) return [];
     return rankPrescoutPartners(selectedPrescout, prescoutRanking, psMode);
-  }, [selectedPrescout, prescoutRanking, psMode, isPrescout]);
+  }, [selectedPrescout, prescoutRanking, psMode, useSeasonData]);
 
-  const activeMode = isPrescout
+  const activeMode = useSeasonData
     ? PRESCOUT_MODES.find((m) => m.key === psMode)!
     : MODES.find((m) => m.key === mode)!;
 
@@ -757,33 +777,29 @@ export default function PartnersPage() {
 
   if (!event) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-zinc-200 mb-1">No event loaded</h2>
-        <p className="text-sm text-zinc-500 max-w-xs">
-          Enter an FTC event code in the loader above to find the best alliance partners.
-        </p>
-      </div>
+      <EmptyState
+        title="Find your ideal alliance partner"
+        description="Load an event to see ranked compatibility scores across every team."
+      />
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-page-fade-in">
       <PrescoutBanner />
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6 flex-1">
+      <div className="p-4 sm:p-6 max-w-[1200px] mx-auto space-y-6 flex-1 w-full">
         {/* Header */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Partner Finder</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {isPrescout
-              ? `Select your team to see ranked alliance partners based on season performance`
-              : `Select your team to see ranked alliance partners at ${event.name}`
-            }
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-[var(--text-primary)] tracking-tight">
+              Partner Finder
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              {useSeasonData
+                ? `Ranked alliance partners based on season performance`
+                : `Ranked alliance partners at ${event.name}`}
+            </p>
+          </div>
         </div>
 
         {/* Team selector */}
@@ -807,22 +823,22 @@ export default function PartnersPage() {
 
         {/* Selected team card */}
         {selectedTeam && (
-          <SelectedTeamCard team={selectedTeam} isPrescout={isPrescout} prescoutTeam={selectedPrescout} />
+          <SelectedTeamCard team={selectedTeam} isPrescout={useSeasonData} prescoutTeam={selectedPrescout} />
         )}
 
         {/* Mode selector */}
         {selectedTeam && (
           <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg overflow-x-auto scrollbar-hide w-full sm:w-fit">
-            {(isPrescout ? PRESCOUT_MODES : MODES).map((m) => (
+            {(useSeasonData ? PRESCOUT_MODES : MODES).map((m) => (
               <button
                 key={m.key}
                 onClick={() => {
-                  if (isPrescout) setPsMode(m.key);
+                  if (useSeasonData) setPsMode(m.key);
                   else setMode(m.key as PartnerMode);
                   setExpandedRow(null);
                 }}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  (isPrescout ? psMode : mode) === m.key
+                  (useSeasonData ? psMode : mode) === m.key
                     ? "bg-[var(--accent)] text-white shadow-sm"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
                 }`}
@@ -834,7 +850,7 @@ export default function PartnersPage() {
         )}
 
         {/* Partner list (live) */}
-        {selectedTeam && !isPrescout && ranked.length > 0 && (
+        {selectedTeam && !useSeasonData && ranked.length > 0 && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>
@@ -873,6 +889,7 @@ export default function PartnersPage() {
                 selected={selectedTeam}
                 allTeams={teams}
                 penaltyThreshold={penaltyThreshold}
+                mode={mode}
                 expanded={expandedRow === result.teamNumber}
                 onToggle={() => setExpandedRow(expandedRow === result.teamNumber ? null : result.teamNumber)}
               />
@@ -881,7 +898,7 @@ export default function PartnersPage() {
         )}
 
         {/* Partner list (prescout) */}
-        {selectedTeam && isPrescout && prescoutRanked.length > 0 && selectedPrescout && (
+        {selectedTeam && useSeasonData && prescoutRanked.length > 0 && selectedPrescout && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="hidden sm:grid grid-cols-[3rem_1fr_12rem_6rem_9rem_5rem] items-center px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
               <span className="text-xs font-medium text-zinc-500">#</span>
