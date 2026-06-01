@@ -15,10 +15,11 @@ import {
   FavoriteTeam,
   loadFavoriteEvents,
   loadFavoriteTeams,
-  toggleFavoriteEvent,
-  toggleFavoriteTeam,
+  setFavoriteEventRemote,
+  setFavoriteTeamRemote,
   migrateLocalFavorites,
 } from "@/lib/favorites";
+import { useToast } from "@/context/ToastContext";
 import { migrateLocalNotes } from "@/lib/notes";
 import { migrateLocalPickLists } from "@/lib/picklist-sync";
 import { favEventsKey, favTeamsKey, migrateUnscopedKeys } from "@/lib/storage";
@@ -38,12 +39,18 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const migrationAccepted = useMigrationAccepted();
+  const { toast } = useToast();
   const [favoriteEvents, setFavoriteEvents] = useState<FavoriteEvent[]>([]);
   const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>([]);
   const loadedRef = useRef(false);
   const migrationDoneRef = useRef(false);
-  const togglingEventsRef = useRef(new Set<string>());
-  const togglingTeamsRef = useRef(new Set<number>());
+  // Trailing-sync state: latest desired favorited value per key, and which keys
+  // currently have a cloud request in flight. Lets us serialize rapid on/off
+  // toggles so the final cloud state always matches the final UI state.
+  const eventSyncTargets = useRef(new Map<string, boolean>());
+  const eventSyncing = useRef(new Set<string>());
+  const teamSyncTargets = useRef(new Map<number, boolean>());
+  const teamSyncing = useRef(new Set<number>());
 
   const userId = user?.id ?? null;
 
@@ -112,52 +119,90 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     [favoriteTeams]
   );
 
+  // Drain the latest desired state for an event to the cloud, one request at a
+  // time per event. On failure, reconcile UI back to cloud truth and toast.
+  const syncEvent = useCallback(
+    (event: FavoriteEvent, desired: boolean) => {
+      const code = event.event_code;
+      eventSyncTargets.current.set(code, desired);
+      if (eventSyncing.current.has(code)) return; // a runner will pick up the latest target
+      eventSyncing.current.add(code);
+      (async () => {
+        try {
+          while (eventSyncTargets.current.has(code)) {
+            const target = eventSyncTargets.current.get(code)!;
+            eventSyncTargets.current.delete(code);
+            await setFavoriteEventRemote(userId, event, target);
+          }
+        } catch {
+          eventSyncTargets.current.delete(code);
+          toast("Couldn't save favorite — try again", "error");
+          // Pull authoritative cloud state so the star reflects what was saved.
+          refreshFavorites();
+        } finally {
+          eventSyncing.current.delete(code);
+        }
+      })();
+    },
+    [userId, toast, refreshFavorites]
+  );
+
   const toggleEventFav = useCallback(
     async (event: FavoriteEvent) => {
-      if (togglingEventsRef.current.has(event.event_code)) return;
-      togglingEventsRef.current.add(event.event_code);
-      try {
-        const { favorited } = await toggleFavoriteEvent(userId, event);
-        if (favorited) {
-          setFavoriteEvents((prev) =>
-            prev.some((e) => e.event_code === event.event_code)
-              ? prev
-              : [...prev, event]
-          );
-        } else {
-          setFavoriteEvents((prev) =>
-            prev.filter((e) => e.event_code !== event.event_code)
-          );
-        }
-      } finally {
-        togglingEventsRef.current.delete(event.event_code);
-      }
+      const code = event.event_code;
+      const willFavorite = !favoriteEvents.some((e) => e.event_code === code);
+      // Optimistic: flip the star immediately.
+      setFavoriteEvents((prev) =>
+        willFavorite
+          ? prev.some((e) => e.event_code === code)
+            ? prev
+            : [...prev, event]
+          : prev.filter((e) => e.event_code !== code)
+      );
+      syncEvent(event, willFavorite);
     },
-    [userId]
+    [favoriteEvents, syncEvent]
+  );
+
+  const syncTeam = useCallback(
+    (team: FavoriteTeam, desired: boolean) => {
+      const num = team.team_number;
+      teamSyncTargets.current.set(num, desired);
+      if (teamSyncing.current.has(num)) return;
+      teamSyncing.current.add(num);
+      (async () => {
+        try {
+          while (teamSyncTargets.current.has(num)) {
+            const target = teamSyncTargets.current.get(num)!;
+            teamSyncTargets.current.delete(num);
+            await setFavoriteTeamRemote(userId, team, target);
+          }
+        } catch {
+          teamSyncTargets.current.delete(num);
+          toast("Couldn't save favorite — try again", "error");
+          refreshFavorites();
+        } finally {
+          teamSyncing.current.delete(num);
+        }
+      })();
+    },
+    [userId, toast, refreshFavorites]
   );
 
   const toggleTeamFav = useCallback(
     async (team: FavoriteTeam) => {
-      if (togglingTeamsRef.current.has(team.team_number)) return;
-      togglingTeamsRef.current.add(team.team_number);
-      try {
-        const { favorited } = await toggleFavoriteTeam(userId, team);
-        if (favorited) {
-          setFavoriteTeams((prev) =>
-            prev.some((t) => t.team_number === team.team_number)
-              ? prev
-              : [...prev, team]
-          );
-        } else {
-          setFavoriteTeams((prev) =>
-            prev.filter((t) => t.team_number !== team.team_number)
-          );
-        }
-      } finally {
-        togglingTeamsRef.current.delete(team.team_number);
-      }
+      const num = team.team_number;
+      const willFavorite = !favoriteTeams.some((t) => t.team_number === num);
+      setFavoriteTeams((prev) =>
+        willFavorite
+          ? prev.some((t) => t.team_number === num)
+            ? prev
+            : [...prev, team]
+          : prev.filter((t) => t.team_number !== num)
+      );
+      syncTeam(team, willFavorite);
     },
-    [userId]
+    [favoriteTeams, syncTeam]
   );
 
   return (

@@ -3,6 +3,31 @@ import { Event, EventSearchResult, TeamReport, PrescoutTeamData } from "./types"
 const API_URL = "https://api.ftcscout.org/graphql";
 export const CURRENT_SEASON = 2025;
 
+// ── Lightweight in-memory caches ─────────────────────────────────────────────
+// Event data is cached by EventContext, so it is intentionally NOT cached here.
+// These cover the two other hot paths: team reports and event search.
+interface TimedEntry<T> { data: T; timestamp: number }
+
+const teamReportCache = new Map<number, TimedEntry<TeamReport>>();
+const TEAM_REPORT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+const searchCache = new Map<string, TimedEntry<EventSearchResult[]>>();
+const SEARCH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readCache<K, T>(
+  cache: Map<K, TimedEntry<T>>,
+  key: K,
+  ttl: number
+): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > ttl) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
 async function gqlFetch<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const res = await fetch(API_URL, {
     method: "POST",
@@ -257,17 +282,26 @@ const EVENT_SEARCH_QUERY = `
 export async function searchEvents(
   searchText: string
 ): Promise<EventSearchResult[]> {
+  const key = searchText.trim().toLowerCase();
+  const cached = readCache(searchCache, key, SEARCH_TTL_MS);
+  if (cached) return cached;
+
   const data = await gqlFetch<{ eventsSearch: EventSearchResult[] }>(
     EVENT_SEARCH_QUERY,
     { season: CURRENT_SEASON, searchText }
   );
-  return data.eventsSearch ?? [];
+  const results = data.eventsSearch ?? [];
+  searchCache.set(key, { data: results, timestamp: Date.now() });
+  return results;
 }
 
 export async function getTeamReport(teamNumber: number): Promise<TeamReport> {
   if (!isValidTeamNumber(teamNumber)) {
     throw new Error("Invalid team number");
   }
+
+  const cached = readCache(teamReportCache, teamNumber, TEAM_REPORT_TTL_MS);
+  if (cached) return cached;
 
   const data = await gqlFetch<{ teamByNumber: TeamReport }>(
     TEAM_REPORT_QUERY,
@@ -278,6 +312,7 @@ export async function getTeamReport(teamNumber: number): Promise<TeamReport> {
     throw new Error(`Team ${teamNumber} not found`);
   }
 
+  teamReportCache.set(teamNumber, { data: data.teamByNumber, timestamp: Date.now() });
   return data.teamByNumber;
 }
 

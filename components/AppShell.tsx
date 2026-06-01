@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { QuickSwitcher } from "@/components/QuickSwitcher";
 import { EventLoadingToast } from "@/components/EventLoadingToast";
+import { RefreshBar } from "@/components/RefreshBar";
 import { Tutorial } from "@/components/Tutorial";
 import { isTutorialComplete, setTutorialComplete, clearTutorialComplete } from "@/lib/storage";
 
@@ -30,7 +31,7 @@ function AuthLoadingScreen() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { event, eventCode, loadEvent, setEventCode } = useEvent();
+  const { event, eventCode, loadEvent, setEventCode, loading } = useEvent();
   const { user, loading: authLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -130,6 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--bg-primary)]">
+      <RefreshBar active={loading} />
       {/* Mobile top bar — visible only on <768px */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between h-14 px-2 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] md:hidden">
         <h1 className="font-display text-[15px] tracking-tight pl-2">

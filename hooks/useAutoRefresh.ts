@@ -98,6 +98,18 @@ export function useAutoRefresh(): AutoRefreshState {
     };
   }, [isLive, refresh]);
 
+  // Refresh immediately when the tab becomes visible again. The 60s poll above
+  // skips hidden tabs, so returning to a backgrounded tab could otherwise show
+  // stale scores for up to a minute. Only while live (cheap single fetch).
+  useEffect(() => {
+    if (!isLive) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [isLive, refresh]);
+
   const lastUpdatedText = (() => {
     if (!lastUpdated) return "";
     const s = Math.floor((Date.now() - lastUpdated) / 1000);

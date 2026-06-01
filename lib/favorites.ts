@@ -158,6 +158,49 @@ export async function toggleFavoriteEvent(
   }
 }
 
+/**
+ * Persist an explicit favorited state for an event to Supabase.
+ *
+ * Unlike {@link toggleFavoriteEvent}, this does NOT read localStorage to decide
+ * the action — the caller passes the desired state. This makes it safe to use
+ * with optimistic UI, where React state (and the localStorage sync effect) may
+ * already reflect the new value before this runs. localStorage is owned by the
+ * caller (FavoritesContext's sync effect); this touches the cloud only.
+ *
+ * Throws on a hard Supabase failure so callers can revert optimistic state.
+ * No-ops for anonymous / sessionless users (local-only persistence handled by caller).
+ */
+export async function setFavoriteEventRemote(
+  userId: string | null,
+  event: FavoriteEvent,
+  favorited: boolean
+): Promise<void> {
+  if (!userId) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  if (favorited) {
+    await ensureProfile(session.user.id);
+    const { error } = await supabase.from("favorite_events").upsert(
+      {
+        user_id: session.user.id,
+        event_code: event.event_code,
+        event_name: event.event_name,
+        season: event.season,
+      },
+      { onConflict: "user_id,event_code,season" }
+    );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("favorite_events")
+      .delete()
+      .eq("user_id", session.user.id)
+      .eq("event_code", event.event_code);
+    if (error) throw error;
+  }
+}
+
 // ── Favorite Teams API ──
 
 export async function loadFavoriteTeams(userId: string | null): Promise<FavoriteTeam[]> {
@@ -248,6 +291,41 @@ export async function toggleFavoriteTeam(
   } catch (err) {
     console.warn("[favorites] toggle team failed:", err);
     return { favorited: false };
+  }
+}
+
+/**
+ * Persist an explicit favorited state for a team to Supabase.
+ * See {@link setFavoriteEventRemote} for semantics. Throws on hard failure.
+ */
+export async function setFavoriteTeamRemote(
+  userId: string | null,
+  team: FavoriteTeam,
+  favorited: boolean
+): Promise<void> {
+  if (!userId) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  if (favorited) {
+    await ensureProfile(session.user.id);
+    const { error } = await supabase.from("favorite_teams").upsert(
+      {
+        user_id: session.user.id,
+        team_number: team.team_number,
+        team_name: team.team_name,
+        notes: team.notes,
+      },
+      { onConflict: "user_id,team_number" }
+    );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("favorite_teams")
+      .delete()
+      .eq("user_id", session.user.id)
+      .eq("team_number", team.team_number);
+    if (error) throw error;
   }
 }
 
